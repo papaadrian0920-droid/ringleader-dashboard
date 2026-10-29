@@ -162,7 +162,8 @@ function overviewPage() {
 const testInputs = {
   phone: '(555) 014-' + String(Math.floor(1000 + Math.random() * 9000)),
   text: 'Hi, my water heater is leaking. Can someone come today?',
-  owner: 'I can be there at 2 today. Does that work?'
+  owner: 'I can be there at 2 today. Does that work?',
+  summary: ''
 };
 function testPanel() {
   return `
@@ -182,6 +183,11 @@ function testPanel() {
         <label for="test-owner">You text back from your phone</label>
         <input id="test-owner" value="${esc(testInputs.owner)}" autocomplete="off">
         <button class="btn" type="submit">Simulate your text</button>
+      </form>
+      <form class="test-row" data-test="summary">
+        <span class="label-like">Morning summary</span>
+        <p class="summary-preview">${testInputs.summary ? esc(testInputs.summary) : 'See what the owner would get if the summary went out right now.'}</p>
+        <button class="btn" type="submit">Preview summary</button>
       </form>
       <p class="note">The reply comes from the caller's number above. Try calling twice (only one text goes out), or texting STOP. Your text goes to whoever texted last, or start it with # and a number, like #3, to pick someone.</p>
     </section>`;
@@ -333,6 +339,11 @@ function autotextPage() {
 
         <label class="toggle" for="notify-on"><input type="checkbox" id="notify-on" ${a.notifyOwner ? 'checked' : ''}>Text me at ${esc(data.business.ownerPhone)} when a customer replies. Reply to that text to answer them.</label>
 
+        <div class="summary-row">
+          <label class="toggle" for="summary-on"><input type="checkbox" id="summary-on" ${a.summaryOn ? 'checked' : ''}>Text me a morning summary at</label>
+          <input id="summary-time" aria-label="Summary time" value="${esc(a.summaryTime || '7:00 AM')}" ${a.summaryOn ? '' : 'disabled'}>
+        </div>
+
         <div class="block" style="gap: 10px">
           <h2>Business hours</h2>
           <p class="note">Outside these hours, callers get the "closed" text. Type times like 7:00 AM.</p>
@@ -393,6 +404,8 @@ function readSettingsForm() {
     afterHoursMessage: document.getElementById('msg-after').value,
     afterHoursOn: document.getElementById('ah-on').checked,
     notifyOwner: document.getElementById('notify-on').checked,
+    summaryOn: document.getElementById('summary-on').checked,
+    summaryTime: document.getElementById('summary-time').value,
     hours: data.hours.map((h, i) => document.getElementById('open-' + i).checked
       ? { day: h.day, open: document.getElementById('from-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1'), close: document.getElementById('to-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1') }
       : { day: h.day, open: null, close: null })
@@ -524,6 +537,7 @@ main.addEventListener('input', e => {
   if (e.target.id === 'test-phone') testInputs.phone = e.target.value;
   if (e.target.id === 'test-text') testInputs.text = e.target.value;
   if (e.target.id === 'test-owner') testInputs.owner = e.target.value;
+  if (e.target.id === 'summary-on') document.getElementById('summary-time').disabled = !e.target.checked;
   if (e.target.id === 'msg-main' || e.target.id === 'msg-after') updateAutotext();
   if (e.target.id === 'ah-on') {
     document.getElementById('msg-after').disabled = !e.target.checked;
@@ -557,6 +571,10 @@ main.addEventListener('submit', async e => {
       const r = await api('/api/test/owner-text', { text: document.getElementById('test-owner').value });
       toast(r.sent ? `Your text went to #${r.conversationId}.` : 'Not sent: ' + (r.error || 'nobody to send it to. Check the # number, or simulate a customer reply first.'), !r.sent);
       await refresh();
+    } else if (form.dataset.test === 'summary') {
+      const r = await api('/api/test/morning-summary', {});
+      testInputs.summary = r.text || 'Nothing happened in the last 24 hours, so no summary would be sent.';
+      form.querySelector('.summary-preview').textContent = testInputs.summary;
     }
   } catch (err) {
     toast(err.message, true);

@@ -20,7 +20,9 @@ window.RL_DATA = {
     message: "Hi! This is {business}. Sorry we missed your call, we're probably on a job. What can we help you with? Reply here and we'll get right back to you.",
     afterHoursOn: true,
     afterHoursMessage: "Hi! This is {business}. We're closed right now, but we got your call. Tell us what's going on and we'll text you first thing in the morning.",
-    notifyOwner: true
+    notifyOwner: true,
+    summaryOn: true,
+    summaryTime: "7:00 AM"
   },
 
   hours: [

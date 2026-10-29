@@ -199,7 +199,11 @@ button, input, textarea, select { font: inherit; color: inherit; }
 .dot.off { background: var(--faint); box-shadow: 0 0 0 4px var(--auto); }
 .test-panel { display: grid; gap: 10px; padding: 16px 0; border-top: 2px dashed var(--line); border-bottom: 2px dashed var(--line); }
 .test-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
-.test-row label { font-weight: 600; font-size: .9rem; }
+.test-row label, .test-row .label-like { font-weight: 600; font-size: .9rem; }
+.summary-preview { white-space: pre-line; font-size: .9rem; color: var(--muted); }
+.summary-row { display: grid; grid-template-columns: minmax(0, 1fr) 110px; align-items: center; gap: 10px; }
+.summary-row input { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.summary-row input:disabled { opacity: .4; }
 .test-row input, .hours-row input, .name-form input { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 8px 10px; min-width: 0; }
 @media (max-width: 640px) { .test-row { grid-template-columns: 1fr; } }
 .hours-edit { display: grid; gap: 6px; }

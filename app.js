@@ -323,7 +323,7 @@ function autotextPage() {
     <header class="page-head">
       <p class="label">Text-Back</p>
       <h1>Auto-text</h1>
-      <p class="status-line">This is the text every missed caller gets. Write {business} and it fills in your company name. "Reply STOP to opt out." is added at the end.</p>
+      <p class="status-line">This is the text every missed caller gets. Write {business} and it fills in your company name. Your contact line and "Reply STOP to opt out." are added at the end.</p>
     </header>
 
     <div class="settings">

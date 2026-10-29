@@ -13,13 +13,15 @@ window.RL_DATA = {
   setup: [
     { label: 'Ringleader number is active', done: true },
     { label: 'Call forwarding is on and tested', done: true },
-    { label: 'Texting registration approved', done: true }
+    { label: 'Texting registration approved', done: true },
+    { label: 'Contact line added (CASL)', done: true }
   ],
 
   autoText: {
     message: "Hi! This is {business}. Sorry we missed your call, we're probably on a job. What can we help you with? Reply here and we'll get right back to you.",
     afterHoursOn: true,
     afterHoursMessage: "Hi! This is {business}. We're closed right now, but we got your call. Tell us what's going on and we'll text you first thing in the morning.",
+    contactLine: "18 Barton St E, Hamilton ON, delgadoplumbing.ca",
     notifyOwner: true,
     summaryOn: true,
     summaryTime: "7:00 AM"

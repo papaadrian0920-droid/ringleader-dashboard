@@ -20,6 +20,9 @@ const fill = template => String(template).replace(/\{business\}/g, data.business
 // The server adds this to every auto-text that doesn't already mention STOP.
 const withOptOut = text => /\bSTOP\b/i.test(text) ? text : text.trim() + ' Reply STOP to opt out.';
 
+// The whole auto-text, like the server builds it: the message, the shop's contact line (CASL), then how to stop.
+const autoTextOf = (template, contact) => withOptOut([fill(template).trim(), fill(contact || '').trim()].filter(Boolean).join(' '));
+
 const STATUS = {
   waiting: 'Waiting on you',
   replied: 'You replied',
@@ -72,7 +75,7 @@ async function load() {
     // In the example data the auto-text is left blank, so fill it in from the template.
     data.conversations.forEach(c => {
       const first = c.messages[0];
-      if (first && first.from === 'auto' && !first.text) first.text = withOptOut(fill(data.autoText.message));
+      if (first && first.from === 'auto' && !first.text) first.text = autoTextOf(data.autoText.message, data.autoText.contactLine);
     });
   }
 }
@@ -337,6 +340,12 @@ function autotextPage() {
           <div class="meta" id="meta-after"></div>
         </div>
 
+        <div class="field">
+          <label for="contact-line">Contact line</label>
+          <input id="contact-line" maxlength="160" value="${esc(a.contactLine || '')}" placeholder="12 King St W, Hamilton ON, mikesplumbing.ca">
+          <p class="note">Canada's anti-spam law (CASL) asks business texts to include your mailing address and a phone number, email or website. This goes at the end of both texts, before "Reply STOP to opt out." Stick to plain keyboard characters: one emoji or special symbol makes every text cost about twice as much.</p>
+        </div>
+
         <label class="toggle" for="notify-on"><input type="checkbox" id="notify-on" ${a.notifyOwner ? 'checked' : ''}>Text me at ${esc(data.business.ownerPhone)} when a customer replies. Reply to that text to answer them.</label>
 
         <div class="summary-row">
@@ -388,14 +397,15 @@ let previewWhich = 'main';
 function updateAutotext() {
   const mainBox = document.getElementById('msg-main');
   const afterBox = document.getElementById('msg-after');
+  const contact = document.getElementById('contact-line').value;
   [['main', mainBox], ['after', afterBox]].forEach(([key, box]) => {
-    const text = withOptOut(fill(box.value));
+    const text = autoTextOf(box.value, contact);
     const pieces = textPieces(text);
     document.getElementById('meta-' + key).innerHTML =
       `<span><b>${text.length}</b> characters as sent</span><span><b>${pieces}</b> text${pieces > 1 ? 's' : ''} per missed call</span>`;
   });
   const source = previewWhich === 'after' && document.getElementById('ah-on').checked ? afterBox : mainBox;
-  document.getElementById('preview-bubble').textContent = source.value.trim() ? withOptOut(fill(source.value)) : '…';
+  document.getElementById('preview-bubble').textContent = source.value.trim() ? autoTextOf(source.value, contact) : '…';
 }
 
 function readSettingsForm() {
@@ -403,6 +413,7 @@ function readSettingsForm() {
     message: document.getElementById('msg-main').value,
     afterHoursMessage: document.getElementById('msg-after').value,
     afterHoursOn: document.getElementById('ah-on').checked,
+    contactLine: document.getElementById('contact-line').value,
     notifyOwner: document.getElementById('notify-on').checked,
     summaryOn: document.getElementById('summary-on').checked,
     summaryTime: document.getElementById('summary-time').value,
@@ -538,7 +549,7 @@ main.addEventListener('input', e => {
   if (e.target.id === 'test-text') testInputs.text = e.target.value;
   if (e.target.id === 'test-owner') testInputs.owner = e.target.value;
   if (e.target.id === 'summary-on') document.getElementById('summary-time').disabled = !e.target.checked;
-  if (e.target.id === 'msg-main' || e.target.id === 'msg-after') updateAutotext();
+  if (e.target.id === 'msg-main' || e.target.id === 'msg-after' || e.target.id === 'contact-line') updateAutotext();
   if (e.target.id === 'ah-on') {
     document.getElementById('msg-after').disabled = !e.target.checked;
     updateAutotext();

@@ -177,6 +177,7 @@ button, input, textarea, select { font: inherit; color: inherit; }
 @media (max-width: 900px) { .settings { grid-template-columns: 1fr; } }
 .field { display: grid; gap: 6px; }
 .field label { font-weight: 650; }
+.field input:not([type="checkbox"]) { width: 100%; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 10px 14px; }
 .field textarea { width: 100%; min-height: 110px; resize: vertical; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 12px 14px; line-height: 1.5; }
 .field .meta { display: flex; justify-content: space-between; gap: 10px; font-size: .8rem; color: var(--faint); flex-wrap: wrap; }
 .field .meta b { font-family: var(--f-mono); color: var(--muted); font-weight: 600; }

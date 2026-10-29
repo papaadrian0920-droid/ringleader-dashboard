@@ -331,7 +331,7 @@ function autotextPage() {
           <div class="meta" id="meta-after"></div>
         </div>
 
-        <label class="toggle" for="notify-on"><input type="checkbox" id="notify-on" ${a.notifyOwner ? 'checked' : ''}>Text me at ${esc(data.business.ownerPhone)} when a customer replies</label>
+        <label class="toggle" for="notify-on"><input type="checkbox" id="notify-on" ${a.notifyOwner ? 'checked' : ''}>Text me at ${esc(data.business.ownerPhone)} when a customer replies. Reply to that text to answer them.</label>
 
         <div class="block" style="gap: 10px">
           <h2>Business hours</h2>

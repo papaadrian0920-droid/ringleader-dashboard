@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ringleader Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..900&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Left menu. Each plan gets its own group. -->
+    <aside class="side">
+      <div class="brand">
+        <span class="logo-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+        </span>
+        <div>
+          <b>Ringleader</b>
+          <span id="biz-name">Business</span>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Dashboard">
+        <div class="nav-group">
+          <p class="nav-plan">Text-Back <span class="plan-tag on">Active</span></p>
+          <a href="#overview" data-page="overview">Overview</a>
+          <a href="#conversations" data-page="conversations">Conversations <span class="count" id="waiting-count"></span></a>
+          <a href="#autotext" data-page="autotext">Auto-text</a>
+        </div>
+        <div class="nav-group">
+          <p class="nav-plan">Front Desk <span class="plan-tag">Soon</span></p>
+          <a href="#frontdesk" data-page="frontdesk">What it adds</a>
+        </div>
+        <div class="nav-group">
+          <p class="nav-plan">Crew <span class="plan-tag">Soon</span></p>
+          <a href="#crew" data-page="crew">What it adds</a>
+        </div>
+      </nav>
+
+      <p class="side-foot">Example data. Real calls show up here once the server is built.</p>
+    </aside>
+
+    <!-- app.js draws the current page in here -->
+    <main class="main" id="main"></main>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

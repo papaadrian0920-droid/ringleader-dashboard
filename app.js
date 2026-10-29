@@ -161,7 +161,8 @@ function overviewPage() {
 // The number and text are kept here so they stay the same after the page refreshes.
 const testInputs = {
   phone: '(555) 014-' + String(Math.floor(1000 + Math.random() * 9000)),
-  text: 'Hi, my water heater is leaking. Can someone come today?'
+  text: 'Hi, my water heater is leaking. Can someone come today?',
+  owner: 'I can be there at 2 today. Does that work?'
 };
 function testPanel() {
   return `
@@ -177,7 +178,12 @@ function testPanel() {
         <input id="test-text" value="${esc(testInputs.text)}" autocomplete="off">
         <button class="btn" type="submit">Simulate customer reply</button>
       </form>
-      <p class="note">The reply comes from the caller's number above. Try calling twice (only one text goes out), or texting STOP.</p>
+      <form class="test-row" data-test="owner">
+        <label for="test-owner">You text back from your phone</label>
+        <input id="test-owner" value="${esc(testInputs.owner)}" autocomplete="off">
+        <button class="btn" type="submit">Simulate your text</button>
+      </form>
+      <p class="note">The reply comes from the caller's number above. Try calling twice (only one text goes out), or texting STOP. Your text goes to whoever texted last, or start it with # and a number, like #3, to pick someone.</p>
     </section>`;
 }
 
@@ -270,7 +276,7 @@ function threadHtml(c) {
           ${c.name
             ? `<b>${esc(c.name)}</b>`
             : `<form class="name-form" data-name="${c.id}"><label for="name-box" hidden>Customer name</label><input id="name-box" placeholder="Add their name" maxlength="60" autocomplete="off"><button class="btn" type="submit">Save</button></form>`}
-          <span class="thread-phone">${esc(c.phone)} · ${dayName(c.daysAgo)} ${esc(c.time)}</span>
+          <span class="thread-phone">#${esc(c.id)} · ${esc(c.phone)} · ${dayName(c.daysAgo)} ${esc(c.time)}</span>
         </div>
         <div class="thread-actions">
           ${c.status === 'booked'
@@ -517,6 +523,7 @@ main.addEventListener('click', async e => {
 main.addEventListener('input', e => {
   if (e.target.id === 'test-phone') testInputs.phone = e.target.value;
   if (e.target.id === 'test-text') testInputs.text = e.target.value;
+  if (e.target.id === 'test-owner') testInputs.owner = e.target.value;
   if (e.target.id === 'msg-main' || e.target.id === 'msg-after') updateAutotext();
   if (e.target.id === 'ah-on') {
     document.getElementById('msg-after').disabled = !e.target.checked;
@@ -545,6 +552,10 @@ main.addEventListener('submit', async e => {
     } else if (form.dataset.test === 'text') {
       const r = await api('/api/test/customer-text', { phone: document.getElementById('test-phone').value, text: document.getElementById('test-text').value });
       toast(r.optedOut ? 'They texted STOP. No more texts will go to this number.' : 'Customer reply received.');
+      await refresh();
+    } else if (form.dataset.test === 'owner') {
+      const r = await api('/api/test/owner-text', { text: document.getElementById('test-owner').value });
+      toast(r.sent ? `Your text went to #${r.conversationId}.` : 'Not sent: ' + (r.error || 'nobody to send it to. Check the # number, or simulate a customer reply first.'), !r.sent);
       await refresh();
     }
   } catch (err) {

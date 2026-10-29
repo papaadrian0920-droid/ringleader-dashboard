@@ -1,8 +1,10 @@
 // Ringleader dashboard
-// Reads the data from data.js and draws one page at a time.
+// Gets its data from the server (/api/dashboard) and draws one page at a time.
+// If there's no server (you opened the file by itself), it shows the example data from data.js.
 // The page shown depends on the end of the address: #overview, #conversations, #autotext, #frontdesk, #crew.
 
-const data = window.RL_DATA;
+let data = window.RL_DATA;
+let mode = 'example'; // 'example' = no server, 'test' = server without Twilio keys, 'live' = real texts
 const main = document.getElementById('main');
 
 // ---------- Small helpers ----------
@@ -10,21 +12,20 @@ const main = document.getElementById('main');
 const money = n => '$' + Math.round(n).toLocaleString('en-US');
 
 // Makes text safe to put inside HTML (so a customer's message can't break the page).
-const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 // Puts the business name into a message template.
-const fill = template => template.replace(/\{business\}/g, data.business.name);
+const fill = template => String(template).replace(/\{business\}/g, data.business.name);
 
-// The auto-text is the first message in every conversation.
-data.conversations.forEach(c => {
-  if (c.messages[0] && c.messages[0].from === 'auto' && !c.messages[0].text) c.messages[0].text = fill(data.autoText.message);
-});
+// The server adds this to every auto-text that doesn't already mention STOP.
+const withOptOut = text => /\bSTOP\b/i.test(text) ? text : text.trim() + ' Reply STOP to opt out.';
 
 const STATUS = {
   waiting: 'Waiting on you',
   replied: 'You replied',
   booked: 'Booked',
-  'no-reply': 'No reply yet'
+  'no-reply': 'No reply yet',
+  'opted-out': 'Texted STOP'
 };
 
 // "Today", "Yesterday", or the weekday name.
@@ -37,25 +38,68 @@ function dayName(daysAgo) {
 }
 
 const who = c => c.name || c.phone;
-const lastText = c => c.messages[c.messages.length - 1].text;
+const lastText = c => c.messages.length ? c.messages[c.messages.length - 1].text : '';
 const customerReplied = c => c.messages.some(m => m.from === 'customer');
+const thisWeek = () => data.conversations.filter(c => c.daysAgo <= 6);
+
+function greeting() {
+  const h = new Date().getHours();
+  const part = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  return data.business.owner ? `${part}, ${data.business.owner}.` : `${part}.`;
+}
+
+// A short message at the bottom of the screen ("Saved", or what went wrong).
+let toastTimer;
+function toast(text, isError) {
+  const el = document.getElementById('toast');
+  el.textContent = text;
+  el.classList.toggle('error', Boolean(isError));
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
+}
+
+// ---------- Talking to the server ----------
+
+async function load() {
+  try {
+    const res = await fetch('/api/dashboard', { cache: 'no-store' });
+    if (!res.ok) throw new Error('No server');
+    data = await res.json();
+    mode = data.mode;
+  } catch {
+    mode = 'example';
+    // In the example data the auto-text is left blank, so fill it in from the template.
+    data.conversations.forEach(c => {
+      const first = c.messages[0];
+      if (first && first.from === 'auto' && !first.text) first.text = withOptOut(fill(data.autoText.message));
+    });
+  }
+}
+
+async function api(path, body, method = 'POST') {
+  const res = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || 'Something went wrong. Is the server running?');
+  return json;
+}
 
 // ---------- Numbers (all worked out from the conversations, so they always add up) ----------
 
 function stats() {
-  const all = data.conversations;
-  const booked = all.filter(c => c.status === 'booked');
+  const week = thisWeek();
+  const booked = week.filter(c => c.status === 'booked');
   return {
-    missed: all.length,
-    texted: all.filter(c => c.messages.some(m => m.from === 'auto')).length,
-    replied: all.filter(customerReplied).length,
+    missed: week.length,
+    texted: week.filter(c => c.messages.some(m => m.from === 'auto')).length,
+    replied: week.filter(customerReplied).length,
     booked: booked.length,
     money: booked.reduce((sum, c) => sum + c.value, 0),
-    waiting: all.filter(c => c.status === 'waiting').length
+    waiting: data.conversations.filter(c => c.status === 'waiting').length
   };
 }
 
-const pct = (part, whole) => whole ? Math.round((part / whole) * 100) + '%' : '0%';
+const pct = (part, whole) => whole ? Math.round((part / whole) * 100) + '%' : '–';
 
 // ---------- Page: Overview ----------
 
@@ -63,13 +107,20 @@ function overviewPage() {
   const s = stats();
   const waiting = data.conversations.filter(c => c.status === 'waiting');
   const recent = data.conversations.filter(c => c.status !== 'waiting').slice(0, 6);
+  const statusLine = mode === 'live'
+    ? `Text-Back is on. Calls you miss on ${esc(data.business.ownerPhone)} get a text in about 5 seconds.`
+    : mode === 'test'
+      ? 'Test mode. Nothing is really sent. Use the buttons below to try it.'
+      : `Example data. Calls you miss on ${esc(data.business.ownerPhone)} would get a text in about 5 seconds.`;
 
   return `
     <header class="page-head">
       <p class="label">Text-Back · last 7 days</p>
-      <h1>Good morning, ${esc(data.business.owner)}.</h1>
-      <p class="status-line"><span class="dot"></span>Text-Back is on. Calls you miss on ${esc(data.business.ownerPhone)} get a text in about 5 seconds.</p>
+      <h1>${esc(greeting())}</h1>
+      <p class="status-line"><span class="dot ${mode === 'live' ? '' : 'off'}"></span>${statusLine}</p>
     </header>
+
+    ${mode === 'test' ? testPanel() : ''}
 
     <section class="block" aria-label="This week's results">
       <div class="flow">
@@ -100,9 +151,34 @@ function overviewPage() {
 
     <section class="block">
       <h2>Recent</h2>
-      <div class="rows">${recent.map(rowHtml).join('')}</div>
+      ${recent.length ? `<div class="rows">${recent.map(rowHtml).join('')}</div>`
+        : `<p class="empty">No missed calls yet. When a call is missed, it shows up here.</p>`}
     </section>
   `;
+}
+
+// Only in test mode: pretend to be a caller.
+// The number and text are kept here so they stay the same after the page refreshes.
+const testInputs = {
+  phone: '(555) 014-' + String(Math.floor(1000 + Math.random() * 9000)),
+  text: 'Hi, my water heater is leaking. Can someone come today?'
+};
+function testPanel() {
+  return `
+    <section class="test-panel" aria-label="Test tools">
+      <p class="label">Try it</p>
+      <form class="test-row" data-test="call">
+        <label for="test-phone">Caller's number</label>
+        <input id="test-phone" value="${esc(testInputs.phone)}" autocomplete="off">
+        <button class="btn btn-main" type="submit">Simulate missed call</button>
+      </form>
+      <form class="test-row" data-test="text">
+        <label for="test-text">They text back</label>
+        <input id="test-text" value="${esc(testInputs.text)}" autocomplete="off">
+        <button class="btn" type="submit">Simulate customer reply</button>
+      </form>
+      <p class="note">The reply comes from the caller's number above. Try calling twice (only one text goes out), or texting STOP.</p>
+    </section>`;
 }
 
 function rowHtml(c) {
@@ -126,18 +202,18 @@ function chartSvg() {
     return { label: ago === 0 ? 'Today' : dayName(ago).slice(0, 3), total: list.length, replied: list.filter(customerReplied).length };
   });
   const W = 640, H = 200, L = 28, B = 28, T = 12;
-  const max = Math.max(4, ...days.map(d => d.total));
+  const max = Math.ceil(Math.max(4, ...days.map(d => d.total)) / 2) * 2;
   const step = (W - L) / days.length;
   const bw = step * 0.5;
   const y = v => T + (H - T - B) * (1 - v / max);
   let svg = '';
-  for (let v = 0; v <= max; v += 2) {
+  for (let v = 0; v <= max; v += max > 10 ? 4 : 2) {
     svg += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/>`;
     svg += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--faint)" font-family="IBM Plex Mono, monospace">${v}</text>`;
   }
   days.forEach((d, i) => {
     const x = L + i * step + (step - bw) / 2;
-    svg += `<rect x="${x}" y="${y(d.total)}" width="${bw}" height="${y(0) - y(d.total)}" rx="3" fill="var(--bar)"><title>${d.label}: ${d.total} missed</title></rect>`;
+    if (d.total) svg += `<rect x="${x}" y="${y(d.total)}" width="${bw}" height="${y(0) - y(d.total)}" rx="3" fill="var(--bar)"><title>${d.label}: ${d.total} missed</title></rect>`;
     if (d.replied) svg += `<rect x="${x}" y="${y(d.replied)}" width="${bw}" height="${y(0) - y(d.replied)}" rx="3" fill="var(--ink)"><title>${d.label}: ${d.replied} texted back</title></rect>`;
     svg += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${d.label}</text>`;
   });
@@ -159,7 +235,7 @@ function conversationsPage() {
     <header class="page-head">
       <p class="label">Text-Back</p>
       <h1>Conversations</h1>
-      <p class="status-line">Every missed call starts a text conversation. Reply here and it texts the customer from ${esc(data.business.ringleaderNumber)}.</p>
+      <p class="status-line">Every missed call starts a text conversation. Reply here and it texts the customer from ${esc(data.business.ringleaderNumber || 'your Ringleader number')}.</p>
     </header>
 
     <section class="block">
@@ -173,7 +249,7 @@ function conversationsPage() {
               <span class="top"><b>${esc(who(x))}</b><time>${dayName(x.daysAgo)}</time></span>
               <span class="preview">${esc(lastText(x))}</span>
               <span><span class="pill ${x.status}">${STATUS[x.status]}</span></span>
-            </button>`).join('') : `<p class="empty" style="padding: 14px">Nothing here.</p>`}
+            </button>`).join('') : `<p class="empty" style="padding: 14px">Nothing here yet.</p>`}
         </div>
         ${c ? threadHtml(c) : `<div class="thread"><p class="empty" style="padding: 20px">Pick a conversation.</p></div>`}
       </div>
@@ -181,12 +257,21 @@ function conversationsPage() {
   `;
 }
 
+function messageLabel(m, c) {
+  const base = { auto: 'Auto-text', owner: 'You', customer: who(c) }[m.from] || m.from;
+  return m.status === 'failed' || m.status === 'undelivered' ? base + ' · not delivered' : base;
+}
+
 function threadHtml(c) {
-  const labels = { auto: 'Auto-text', owner: 'You', customer: who(c) };
   return `
     <div class="thread">
       <div class="thread-head">
-        <div><b>${esc(who(c))}</b><span class="thread-phone">${esc(c.phone)} · ${dayName(c.daysAgo)} ${esc(c.time)}</span></div>
+        <div>
+          ${c.name
+            ? `<b>${esc(c.name)}</b>`
+            : `<form class="name-form" data-name="${c.id}"><label for="name-box" hidden>Customer name</label><input id="name-box" placeholder="Add their name" maxlength="60" autocomplete="off"><button class="btn" type="submit">Save</button></form>`}
+          <span class="thread-phone">${esc(c.phone)} · ${dayName(c.daysAgo)} ${esc(c.time)}</span>
+        </div>
         <div class="thread-actions">
           ${c.status === 'booked'
             ? `<span class="pill booked">Booked · ${money(c.value)}</span>`
@@ -198,11 +283,11 @@ function threadHtml(c) {
         </div>
       </div>
       <div class="msgs" id="msgs">
-        ${c.messages.map(m => `<div class="msg ${m.from}"><p>${esc(m.text)}</p><small>${esc(labels[m.from])}</small></div>`).join('')}
+        ${c.messages.map(m => `<div class="msg ${m.from}${m.status === 'failed' || m.status === 'undelivered' ? ' failed' : ''}"><p>${esc(m.text)}</p><small>${esc(messageLabel(m, c))}</small></div>`).join('')}
       </div>
       <form class="composer" data-reply="${c.id}">
         <label for="reply-box" hidden>Reply</label>
-        <input id="reply-box" placeholder="Text ${esc(who(c))}…" maxlength="320" autocomplete="off">
+        <input id="reply-box" placeholder="Text ${esc(who(c))}…" maxlength="640" autocomplete="off">
         <button class="btn btn-main" type="submit">Send</button>
       </form>
     </div>`;
@@ -223,20 +308,20 @@ function autotextPage() {
     <header class="page-head">
       <p class="label">Text-Back</p>
       <h1>Auto-text</h1>
-      <p class="status-line">This is the text every missed caller gets. Write {business} and it fills in your company name.</p>
+      <p class="status-line">This is the text every missed caller gets. Write {business} and it fills in your company name. "Reply STOP to opt out." is added at the end.</p>
     </header>
 
     <div class="settings">
       <div class="block" style="gap: 28px">
         <div class="field">
-          <label for="msg-main">During business hours</label>
-          <textarea id="msg-main">${esc(a.message)}</textarea>
+          <label for="msg-main">When you're open</label>
+          <textarea id="msg-main" maxlength="480">${esc(a.message)}</textarea>
           <div class="meta" id="meta-main"></div>
         </div>
 
         <div class="field">
           <label class="toggle" for="ah-on"><input type="checkbox" id="ah-on" ${a.afterHoursOn ? 'checked' : ''}>Send a different text when you're closed</label>
-          <textarea id="msg-after" ${a.afterHoursOn ? '' : 'disabled'}>${esc(a.afterHoursMessage)}</textarea>
+          <textarea id="msg-after" maxlength="480" ${a.afterHoursOn ? '' : 'disabled'}>${esc(a.afterHoursMessage)}</textarea>
           <div class="meta" id="meta-after"></div>
         </div>
 
@@ -244,20 +329,26 @@ function autotextPage() {
 
         <div class="block" style="gap: 10px">
           <h2>Business hours</h2>
-          <dl class="hours">
-            ${data.hours.map(h => `<dt>${h.day}</dt><dd>${h.open ? `${h.open} – ${h.close}` : 'Closed'}</dd>`).join('')}
-          </dl>
+          <p class="note">Outside these hours, callers get the "closed" text. Type times like 7:00 AM.</p>
+          <div class="hours-edit">
+            ${data.hours.map((h, i) => `
+              <div class="hours-row">
+                <label class="toggle" for="open-${i}"><input type="checkbox" id="open-${i}" data-day="${i}" ${h.open ? 'checked' : ''}>${h.day}</label>
+                <input id="from-${i}" aria-label="${h.day} opens" value="${esc(h.open || '7:00 AM')}" ${h.open ? '' : 'disabled'}>
+                <span>to</span>
+                <input id="to-${i}" aria-label="${h.day} closes" value="${esc(h.close || '6:00 PM')}" ${h.open ? '' : 'disabled'}>
+              </div>`).join('')}
+          </div>
         </div>
 
         <div class="block" style="gap: 10px">
           <h2>Setup</h2>
           <ul class="checks">${data.setup.map(s => `<li class="${s.done ? 'done' : ''}">${esc(s.label)}</li>`).join('')}</ul>
-          <p class="note">Your Ringleader number: <b>${esc(data.business.ringleaderNumber)}</b></p>
+          <p class="note">Your Ringleader number: <b>${esc(data.business.ringleaderNumber || 'not set up yet')}</b></p>
         </div>
 
         <div class="save-row">
           <button class="btn btn-main" type="button" id="save">Save changes</button>
-          <span class="note" id="save-msg" aria-live="polite"></span>
         </div>
       </div>
 
@@ -268,8 +359,8 @@ function autotextPage() {
           <div class="bubble" id="preview-bubble"></div>
         </div>
         <div class="tabs" role="group" aria-label="Preview which text">
-          <button type="button" data-preview="main" aria-pressed="true">Open</button>
-          <button type="button" data-preview="after" aria-pressed="false">Closed</button>
+          <button type="button" data-preview="main" aria-pressed="${previewWhich === 'main'}">Open</button>
+          <button type="button" data-preview="after" aria-pressed="${previewWhich === 'after'}">Closed</button>
         </div>
       </aside>
     </div>
@@ -278,16 +369,28 @@ function autotextPage() {
 
 let previewWhich = 'main';
 function updateAutotext() {
-  const main = document.getElementById('msg-main');
-  const after = document.getElementById('msg-after');
-  [['main', main], ['after', after]].forEach(([key, box]) => {
-    const text = fill(box.value);
+  const mainBox = document.getElementById('msg-main');
+  const afterBox = document.getElementById('msg-after');
+  [['main', mainBox], ['after', afterBox]].forEach(([key, box]) => {
+    const text = withOptOut(fill(box.value));
     const pieces = textPieces(text);
     document.getElementById('meta-' + key).innerHTML =
-      `<span><b>${text.length}</b> characters with your name filled in</span><span><b>${pieces}</b> text${pieces > 1 ? 's' : ''} per missed call</span>`;
+      `<span><b>${text.length}</b> characters as sent</span><span><b>${pieces}</b> text${pieces > 1 ? 's' : ''} per missed call</span>`;
   });
-  const source = previewWhich === 'after' && document.getElementById('ah-on').checked ? after : main;
-  document.getElementById('preview-bubble').textContent = fill(source.value) || '…';
+  const source = previewWhich === 'after' && document.getElementById('ah-on').checked ? afterBox : mainBox;
+  document.getElementById('preview-bubble').textContent = source.value.trim() ? withOptOut(fill(source.value)) : '…';
+}
+
+function readSettingsForm() {
+  return {
+    message: document.getElementById('msg-main').value,
+    afterHoursMessage: document.getElementById('msg-after').value,
+    afterHoursOn: document.getElementById('ah-on').checked,
+    notifyOwner: document.getElementById('notify-on').checked,
+    hours: data.hours.map((h, i) => document.getElementById('open-' + i).checked
+      ? { day: h.day, open: document.getElementById('from-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1'), close: document.getElementById('to-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1') }
+      : { day: h.day, open: null, close: null })
+  };
 }
 
 // ---------- Pages: Front Desk and Crew (not built yet) ----------
@@ -342,23 +445,42 @@ const PAGES = {
   frontdesk: () => soonPage('frontdesk'),
   crew: () => soonPage('crew')
 };
+const currentPage = () => location.hash.slice(1) in PAGES ? location.hash.slice(1) : 'overview';
 
 function render() {
-  const page = location.hash.slice(1) in PAGES ? location.hash.slice(1) : 'overview';
+  const page = currentPage();
   main.innerHTML = PAGES[page]();
   document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
   document.getElementById('biz-name').textContent = data.business.name;
   document.getElementById('waiting-count').textContent = stats().waiting || '';
+  document.getElementById('side-foot').textContent =
+    mode === 'live' ? 'Live. Texts send from ' + data.business.ringleaderNumber + '.'
+      : mode === 'test' ? 'Test mode. No real texts are sent.'
+        : 'Example data. Start the server to see real calls.';
   if (page === 'autotext') updateAutotext();
   const msgs = document.getElementById('msgs');
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
 }
 
+async function refresh() {
+  await load();
+  render();
+}
+
 window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
+
+// Check for new texts every 15 seconds, unless you're in the middle of typing.
+setInterval(() => {
+  if (mode === 'example' || document.hidden) return;
+  const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+  if (typing || currentPage() === 'autotext') return;
+  const y = window.scrollY;
+  refresh().then(() => window.scrollTo(0, y));
+}, 15000);
 
 // ---------- Clicks and typing ----------
 
-main.addEventListener('click', e => {
+main.addEventListener('click', async e => {
   const open = e.target.closest('[data-open]');
   if (open) {
     openId = Number(open.dataset.open);
@@ -375,43 +497,106 @@ main.addEventListener('click', e => {
     return;
   }
   if (e.target.id === 'save') {
-    // For now this only changes the page. Once the server exists, this sends the settings to it.
-    data.autoText.message = document.getElementById('msg-main').value;
-    data.autoText.afterHoursMessage = document.getElementById('msg-after').value;
-    data.autoText.afterHoursOn = document.getElementById('ah-on').checked;
-    data.autoText.notifyOwner = document.getElementById('notify-on').checked;
-    document.getElementById('save-msg').textContent = 'Saved on this page. Real saving comes when we build the server.';
+    const settings = readSettingsForm();
+    if (mode === 'example') {
+      Object.assign(data.autoText, settings);
+      data.hours = settings.hours;
+      toast('Saved on this page only. Start the server to save for real.');
+      return;
+    }
+    try {
+      await api('/api/settings', settings, 'PUT');
+      await refresh();
+      toast('Saved.');
+    } catch (err) {
+      toast(err.message, true);
+    }
   }
 });
 
 main.addEventListener('input', e => {
+  if (e.target.id === 'test-phone') testInputs.phone = e.target.value;
+  if (e.target.id === 'test-text') testInputs.text = e.target.value;
   if (e.target.id === 'msg-main' || e.target.id === 'msg-after') updateAutotext();
   if (e.target.id === 'ah-on') {
     document.getElementById('msg-after').disabled = !e.target.checked;
     updateAutotext();
   }
+  if (e.target.dataset.day !== undefined) {
+    const i = e.target.dataset.day;
+    document.getElementById('from-' + i).disabled = !e.target.checked;
+    document.getElementById('to-' + i).disabled = !e.target.checked;
+  }
 });
 
-main.addEventListener('submit', e => {
+main.addEventListener('submit', async e => {
   e.preventDefault();
   const form = e.target;
-  if (form.dataset.reply) {
-    const box = form.querySelector('input');
-    const text = box.value.trim();
-    if (!text) return;
-    const c = data.conversations.find(x => x.id === Number(form.dataset.reply));
-    c.messages.push({ from: 'owner', text });
-    if (c.status === 'waiting' || c.status === 'no-reply') c.status = 'replied';
-    render();
-    document.getElementById('reply-box').focus();
-  }
-  if (form.dataset.book) {
-    const raw = form.querySelector('input').value.replace(/[^0-9.]/g, '');
-    const c = data.conversations.find(x => x.id === Number(form.dataset.book));
-    c.status = 'booked';
-    c.value = Number(raw) || 0;
-    render();
+  const button = form.querySelector('button');
+  button.disabled = true;
+  try {
+    if (form.dataset.reply) await sendReply(form);
+    else if (form.dataset.book) await markBooked(form);
+    else if (form.dataset.name) await saveName(form);
+    else if (form.dataset.test === 'call') {
+      const r = await api('/api/test/missed-call', { phone: document.getElementById('test-phone').value });
+      toast(r.texted ? 'Missed call. Auto-text sent (see the server window).' : 'Missed call, but no text sent: ' + ({ 'recently-texted': 'they already got one in the last 12 hours', 'opted-out': 'they texted STOP', 'no-caller-id': 'no caller ID' }[r.reason] || r.reason) + '.');
+      await refresh();
+    } else if (form.dataset.test === 'text') {
+      const r = await api('/api/test/customer-text', { phone: document.getElementById('test-phone').value, text: document.getElementById('test-text').value });
+      toast(r.optedOut ? 'They texted STOP. No more texts will go to this number.' : 'Customer reply received.');
+      await refresh();
+    }
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    button.disabled = false;
   }
 });
 
-render();
+async function sendReply(form) {
+  const box = form.querySelector('input');
+  const text = box.value.trim();
+  if (!text) return;
+  const id = Number(form.dataset.reply);
+  if (mode === 'example') {
+    const c = data.conversations.find(x => x.id === id);
+    c.messages.push({ from: 'owner', text });
+    if (c.status !== 'booked') c.status = 'replied';
+    render();
+  } else {
+    await api(`/api/conversations/${id}/reply`, { text });
+    await refresh();
+  }
+  document.getElementById('reply-box')?.focus();
+}
+
+async function markBooked(form) {
+  const value = form.querySelector('input').value;
+  const id = Number(form.dataset.book);
+  if (mode === 'example') {
+    const c = data.conversations.find(x => x.id === id);
+    c.status = 'booked';
+    c.value = Number(value.replace(/[^0-9.]/g, '')) || 0;
+    render();
+  } else {
+    await api(`/api/conversations/${id}/book`, { value });
+    await refresh();
+  }
+  toast('Marked as booked.');
+}
+
+async function saveName(form) {
+  const name = form.querySelector('input').value.trim();
+  if (!name) return;
+  const id = Number(form.dataset.name);
+  if (mode === 'example') {
+    data.conversations.find(x => x.id === id).name = name;
+    render();
+  } else {
+    await api(`/api/conversations/${id}/name`, { name });
+    await refresh();
+  }
+}
+
+refresh();

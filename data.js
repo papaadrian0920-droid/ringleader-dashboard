@@ -23,6 +23,7 @@ window.RL_DATA = {
     afterHoursMessage: "Hi! This is {business}. We're closed right now, but we got your call. Tell us what's going on and we'll text you first thing in the morning.",
     contactLine: "18 Barton St E, Hamilton ON, delgadoplumbing.ca",
     notifyOwner: true,
+    intakeOn: true,
     followUpOn: true,
     followUpMessage: "Hi, it's {business} again. Just checking in, do you still need a hand? Reply here anytime.",
     summaryOn: true,
@@ -40,7 +41,8 @@ window.RL_DATA = {
   ],
 
   // One conversation per missed call.
-  // status: 'waiting'  = customer texted back, shop hasn't answered yet
+  // status: 'ready'    = the assistant got the job details, ready to book
+  //         'waiting'  = customer texted back, shop hasn't answered yet
   //         'replied'  = shop answered, waiting on the customer
   //         'booked'   = turned into a job (value = job price)
   //         'no-reply' = customer never texted back
@@ -82,10 +84,18 @@ window.RL_DATA = {
       ] },
     { id: 8, name: null, phone: '(555) 014-4410', daysAgo: 3, time: '3:22 PM', status: 'no-reply', value: 0,
       messages: [{ from: 'auto', text: '' }] },
-    { id: 9, name: 'Sam Ortiz', phone: '(555) 014-8836', daysAgo: 3, time: '7:51 PM', status: 'waiting', value: 0,
+    { id: 9, name: 'Sam Ortiz', phone: '(555) 014-8836', daysAgo: 3, time: '7:51 PM', status: 'ready', value: 0,
+      summary: 'Sam Ortiz, 45 Elm St, low water pressure in the whole house, no leak, mornings work',
       messages: [
         { from: 'auto', text: '' },
-        { from: 'customer', text: 'Low water pressure in the whole house since this morning' }
+        { from: 'customer', text: 'Low water pressure in the whole house since this morning' },
+        { from: 'assistant', text: "Thanks! What's your name and the address for the job?" },
+        { from: 'customer', text: 'Sam Ortiz, 45 Elm St' },
+        { from: 'assistant', text: 'Got it. Is anything leaking, flooding or unsafe right now, or can it wait a day or two?' },
+        { from: 'customer', text: 'No leak, just annoying' },
+        { from: 'assistant', text: 'Last question: what day or time works best for a visit?' },
+        { from: 'customer', text: 'Mornings are best' },
+        { from: 'assistant', text: 'Perfect, thanks! Marco will text you shortly to set up a time.' }
       ] },
     { id: 10, name: 'Priya Nair', phone: '(555) 014-2075', daysAgo: 4, time: '11:10 AM', status: 'booked', value: 240,
       messages: [

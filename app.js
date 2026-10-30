@@ -23,7 +23,12 @@ const withOptOut = text => /\bSTOP\b/i.test(text) ? text : text.trim() + ' Reply
 // The whole auto-text, like the server builds it: the message, the shop's contact line (CASL), then how to stop.
 const autoTextOf = (template, contact) => withOptOut([fill(template).trim(), fill(contact || '').trim()].filter(Boolean).join(' '));
 
+// Conversations the owner needs to act on: ready to book, or the customer wrote and is waiting.
+const needsYou = c => c.status === 'ready' || c.status === 'waiting';
+
 const STATUS = {
+  ready: 'Ready to book',
+  gathering: 'Getting details',
   waiting: 'Waiting on you',
   replied: 'You replied',
   booked: 'Booked',
@@ -98,7 +103,7 @@ function stats() {
     replied: week.filter(customerReplied).length,
     booked: booked.length,
     money: booked.reduce((sum, c) => sum + c.value, 0),
-    waiting: data.conversations.filter(c => c.status === 'waiting').length
+    waiting: data.conversations.filter(needsYou).length
   };
 }
 
@@ -108,8 +113,8 @@ const pct = (part, whole) => whole ? Math.round((part / whole) * 100) + '%' : 'â
 
 function overviewPage() {
   const s = stats();
-  const waiting = data.conversations.filter(c => c.status === 'waiting');
-  const recent = data.conversations.filter(c => c.status !== 'waiting').slice(0, 6);
+  const waiting = data.conversations.filter(needsYou);
+  const recent = data.conversations.filter(c => !needsYou(c)).slice(0, 6);
   const statusLine = mode === 'live'
     ? `Text-Back is on. Calls you miss on ${esc(data.business.ownerPhone)} get a text in about 5 seconds.`
     : mode === 'test'
@@ -247,7 +252,7 @@ let openId = null;
 
 function conversationsPage() {
   const list = data.conversations.filter(c =>
-    filter === 'all' ? true : filter === 'waiting' ? c.status === 'waiting' : c.status === 'booked');
+    filter === 'all' ? true : filter === 'waiting' ? needsYou(c) : c.status === 'booked');
   if (!list.some(c => c.id === openId)) openId = list[0] ? list[0].id : null;
   const c = data.conversations.find(x => x.id === openId);
 
@@ -278,7 +283,7 @@ function conversationsPage() {
 }
 
 function messageLabel(m, c) {
-  const base = { auto: 'Auto-text', followup: 'Follow-up', owner: 'You', customer: who(c) }[m.from] || m.from;
+  const base = { auto: 'Auto-text', followup: 'Follow-up', assistant: 'Assistant', owner: 'You', customer: who(c) }[m.from] || m.from;
   return m.status === 'failed' || m.status === 'undelivered' ? base + ' Â· not delivered' : base;
 }
 
@@ -302,6 +307,7 @@ function threadHtml(c) {
                </form>`}
         </div>
       </div>
+      ${c.summary ? `<div class="job-card${c.status === 'ready' ? ' ready' : ''}"><span>${c.status === 'ready' ? 'Ready to book' : 'Job details so far'}</span><p>${esc(c.summary)}</p></div>` : ''}
       <div class="msgs" id="msgs">
         ${c.messages.map(m => `<div class="msg ${m.from}${m.status === 'failed' || m.status === 'undelivered' ? ' failed' : ''}"><p>${esc(m.text)}</p><small>${esc(messageLabel(m, c))}</small></div>`).join('')}
       </div>
@@ -356,6 +362,8 @@ function autotextPage() {
           <input id="contact-line" maxlength="160" value="${esc(a.contactLine || '')}" placeholder="12 King St W, Hamilton ON, mikesplumbing.ca">
           <p class="note">Canada's anti-spam law (CASL) asks business texts to include your mailing address and a phone number, email or website. This goes at the end of both texts, before "Reply STOP to opt out." Stick to plain keyboard characters: one emoji or special symbol makes every text cost about twice as much.</p>
         </div>
+
+        <label class="toggle" for="intake-on"><input type="checkbox" id="intake-on" ${a.intakeOn ? 'checked' : ''}>When a caller texts back, ask them for the job details first (name, address, how urgent, best time), then text me one summary</label>
 
         <label class="toggle" for="notify-on"><input type="checkbox" id="notify-on" ${a.notifyOwner ? 'checked' : ''}>Text me at ${esc(data.business.ownerPhone)} when a customer replies. Reply to that text to answer them.</label>
 
@@ -426,6 +434,7 @@ function readSettingsForm() {
     afterHoursOn: document.getElementById('ah-on').checked,
     contactLine: document.getElementById('contact-line').value,
     notifyOwner: document.getElementById('notify-on').checked,
+    intakeOn: document.getElementById('intake-on').checked,
     followUpOn: document.getElementById('fu-on').checked,
     followUpMessage: document.getElementById('msg-follow').value,
     summaryOn: document.getElementById('summary-on').checked,

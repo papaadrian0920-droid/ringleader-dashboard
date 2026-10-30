@@ -40,24 +40,57 @@ window.RL_DATA = {
     { day: 'Sun', open: null, close: null }
   ],
 
+  // What the AI assistant collects from every caller before the owner is texted (the server sends the same list).
+  checklist: [
+    { key: 'name', label: 'Name' },
+    { key: 'problem', label: "What's wrong" },
+    { key: 'where', label: 'Where in the home' },
+    { key: 'started', label: 'When it started' },
+    { key: 'urgent', label: 'How urgent' },
+    { key: 'address', label: 'Address' },
+    { key: 'property', label: 'Home type' },
+    { key: 'free', label: "When they're free" }
+  ],
+
   // One conversation per missed call.
-  // status: 'ready'    = the assistant got the job details, ready to book
-  //         'waiting'  = customer texted back, shop hasn't answered yet
+  // status: 'gathering' = the AI is still asking for the job details
+  //         'ready'    = the AI got every detail, ready to book
+  //         'waiting'  = the customer is waiting on the shop (asked about timing, or texted with the AI off)
   //         'replied'  = shop answered, waiting on the customer
   //         'booked'   = turned into a job (value = job price)
   //         'no-reply' = customer never texted back
   conversations: [
     { id: 1, name: 'Maria Gomez', phone: '(555) 014-2290', daysAgo: 0, time: '7:42 AM', status: 'waiting', value: 0,
+      summary: 'Maria Gomez, 22 Locke St S: kitchen sink backing up into the dishwasher, wants someone today',
+      details: {
+        items: { name: 'Maria Gomez', problem: 'Sink backing up into the dishwasher', where: 'Kitchen', started: 'Last night', urgent: 'Not leaking, but no kitchen sink', address: '22 Locke St S, Hamilton', property: 'House, owns', free: 'not sure' },
+        timingAsked: true, done: true
+      },
       messages: [
         { from: 'auto', text: '' },
-        { from: 'customer', text: 'Hi, my kitchen sink is backing up into the dishwasher. Can someone come today?' }
+        { from: 'customer', text: 'Hi, my kitchen sink is backing up into the dishwasher. Can someone come today?' },
+        { from: 'assistant', text: "Sorry to hear that! Marco will text you about timing. What's your name, and when did it start?" },
+        { from: 'customer', text: 'Maria Gomez. Started last night' },
+        { from: 'assistant', text: "Thanks Maria. Is any water leaking onto the floor? And what's the address?" },
+        { from: 'customer', text: 'No leak, just cant use the sink. 22 Locke St S' },
+        { from: 'assistant', text: 'Got it. Is it a house or condo, do you own or rent, and what times usually work for a visit?' },
+        { from: 'customer', text: 'House, we own. Not sure what time honestly, depends on work' },
+        { from: 'assistant', text: "Perfect, that's everything. Marco will text you shortly about timing." }
       ] },
     { id: 2, name: null, phone: '(555) 014-7731', daysAgo: 0, time: '10:15 AM', status: 'no-reply', value: 0,
       messages: [{ from: 'auto', text: '' }] },
-    { id: 3, name: 'Derek Hall', phone: '(555) 014-3318', daysAgo: 0, time: '12:03 PM', status: 'waiting', value: 0,
+    { id: 3, name: 'Derek Hall', phone: '(555) 014-3318', daysAgo: 0, time: '12:03 PM', status: 'gathering', value: 0,
+      summary: 'Derek Hall: water heater popping, asked about price',
+      details: {
+        items: { name: 'Derek Hall', problem: 'Water heater making a popping noise', where: 'Basement', started: '', urgent: 'No leak', address: '', property: '', free: '' },
+        timingAsked: false, done: false
+      },
       messages: [
         { from: 'auto', text: '' },
-        { from: 'customer', text: 'Water heater is making a popping noise. How much for someone to look at it?' }
+        { from: 'customer', text: 'Water heater is making a popping noise. How much for someone to look at it?' },
+        { from: 'assistant', text: "Marco will go over pricing with you directly. Can I get your name, and is anything leaking right now?" },
+        { from: 'customer', text: "Derek Hall. No leak, it's in the basement" },
+        { from: 'assistant', text: "Thanks Derek. When did the popping start? And what's the address?" }
       ] },
     { id: 4, name: 'Linda Park', phone: '(555) 014-5520', daysAgo: 1, time: '8:20 AM', status: 'booked', value: 1450,
       messages: [
@@ -85,17 +118,21 @@ window.RL_DATA = {
     { id: 8, name: null, phone: '(555) 014-4410', daysAgo: 3, time: '3:22 PM', status: 'no-reply', value: 0,
       messages: [{ from: 'auto', text: '' }] },
     { id: 9, name: 'Sam Ortiz', phone: '(555) 014-8836', daysAgo: 3, time: '7:51 PM', status: 'ready', value: 0,
-      summary: 'Sam Ortiz, 45 Elm St, low water pressure in the whole house, no leak, mornings work',
+      summary: 'Sam Ortiz, 45 Elm St: low water pressure in the whole house, no leak, mornings work',
+      details: {
+        items: { name: 'Sam Ortiz', problem: 'Low water pressure', where: 'Whole house', started: 'This morning', urgent: 'No leak, can wait', address: '45 Elm St, Hamilton', property: 'House, rents', free: 'Weekday mornings' },
+        timingAsked: false, done: true
+      },
       messages: [
         { from: 'auto', text: '' },
         { from: 'customer', text: 'Low water pressure in the whole house since this morning' },
         { from: 'assistant', text: "Thanks! What's your name and the address for the job?" },
         { from: 'customer', text: 'Sam Ortiz, 45 Elm St' },
-        { from: 'assistant', text: 'Got it. Is anything leaking, flooding or unsafe right now, or can it wait a day or two?' },
+        { from: 'assistant', text: 'Got it. Is anything leaking or flooding right now, or can it wait a day or two?' },
         { from: 'customer', text: 'No leak, just annoying' },
-        { from: 'assistant', text: 'Last question: what day or time works best for a visit?' },
-        { from: 'customer', text: 'Mornings are best' },
-        { from: 'assistant', text: 'Perfect, thanks! Marco will text you shortly to set up a time.' }
+        { from: 'assistant', text: 'Is it a house or condo, and do you own or rent? And what times usually work for a visit?' },
+        { from: 'customer', text: 'House, renting. Weekday mornings are best' },
+        { from: 'assistant', text: "Perfect, that's everything. Marco will text you shortly to set up a time." }
       ] },
     { id: 10, name: 'Priya Nair', phone: '(555) 014-2075', daysAgo: 4, time: '11:10 AM', status: 'booked', value: 240,
       messages: [

@@ -28,7 +28,7 @@ const needsYou = c => c.status === 'ready' || c.status === 'waiting';
 
 const STATUS = {
   ready: 'Ready to book',
-  gathering: 'Getting details',
+  gathering: 'AI asking',
   waiting: 'Waiting on you',
   replied: 'You replied',
   booked: 'Booked',
@@ -209,7 +209,7 @@ function tickerHtml() {
     booked: `${who(c)} booked ${money(c.value)}`,
     ready: `${who(c)} is ready to book`,
     waiting: `${who(c)} texted back`,
-    gathering: `Getting details from ${who(c)}`,
+    gathering: `The AI is asking ${who(c)} for details`,
     replied: `You replied to ${who(c)}`,
     'no-reply': `Missed call from ${c.phone}, texted back`,
     'opted-out': `${who(c)} opted out`
@@ -403,59 +403,71 @@ function testPanel() {
 
 let filter = 'all';
 let openId = null;
+let editingName = false;
+
+const FILTERS = [
+  ['all', 'All', () => true],
+  ['needs', 'Needs you', needsYou],
+  ['ai', 'AI asking', c => c.status === 'gathering'],
+  ['booked', 'Booked', c => c.status === 'booked']
+];
+const checklist = () => data.checklist || [];
+const detailsIn = c => c.details ? checklist().filter(i => c.details.items[i.key]).length : 0;
+const firstName = c => c.name ? c.name.split(' ')[0] : 'them';
+const telLink = c => 'tel:+1' + String(c.phone).replace(/\D/g, '').slice(-10);
 
 function conversationsPage() {
-  const list = data.conversations.filter(c =>
-    filter === 'all' ? true : filter === 'waiting' ? needsYou(c) : c.status === 'booked');
-  if (!list.some(c => c.id === openId)) openId = list[0] ? list[0].id : null;
+  const test = (FILTERS.find(f => f[0] === filter) || FILTERS[0])[2];
+  const list = data.conversations.filter(test);
+  if (!list.some(c => c.id === openId)) { openId = list[0] ? list[0].id : null; editingName = false; }
   const c = data.conversations.find(x => x.id === openId);
 
   return `
     <header class="page-top">
       <h1 class="page-title">Texts<span class="hi">.</span></h1>
       <div class="tabs" role="group" aria-label="Filter conversations">
-        ${['all', 'waiting', 'booked'].map(f => `<button type="button" data-filter="${f}" aria-pressed="${filter === f}">${f === 'all' ? 'All' : f === 'waiting' ? 'Needs you' : 'Booked'}</button>`).join('')}
+        ${FILTERS.map(([key, label, fn]) => `<button type="button" data-filter="${key}" aria-pressed="${filter === key}">${label}<span class="n">${data.conversations.filter(fn).length}</span></button>`).join('')}
       </div>
     </header>
 
     <section class="inbox">
       <div class="inbox-list">
-        ${list.length ? list.map(x => `
-          <button type="button" data-open="${x.id}" class="${x.id === openId ? 'active' : ''}">
-            <span class="top"><b>${esc(who(x))}</b><time>${dayName(x.daysAgo)}</time></span>
-            <span class="preview">${esc(lastText(x))}</span>
-            <span><span class="pill ${x.status}">${STATUS[x.status]}${x.status === 'booked' ? ' ' + money(x.value) : ''}</span></span>
-          </button>`).join('') : `<p class="empty" style="padding: 14px">Nothing here yet.</p>`}
+        ${list.length ? list.map(listItem).join('') : `<p class="empty" style="padding: 14px">Nothing here right now.</p>`}
       </div>
-      ${c ? threadHtml(c) : `<div class="thread"><p class="empty" style="padding: 24px">Pick a conversation.</p></div>`}
+      ${c ? threadHtml(c) + jobPanel(c) : `<div class="thread"><p class="empty" style="padding: 24px">Pick a conversation.</p></div>`}
     </section>
   `;
 }
 
+function listItem(x) {
+  // Once the AI has the details, the one-line job summary says more than the last text.
+  const line = x.summary && x.status !== 'no-reply' ? x.summary : lastText(x);
+  const progress = x.status === 'gathering' ? ` ${detailsIn(x)}/${checklist().length}` : '';
+  return `
+    <button type="button" data-open="${x.id}" class="${x.id === openId ? 'active' : ''} ${x.status}">
+      <span class="top"><b>${esc(who(x))}</b><time>${dayName(x.daysAgo)}</time></span>
+      <span class="preview">${esc(line)}</span>
+      <span><span class="pill ${x.status}">${STATUS[x.status]}${progress}${x.status === 'booked' ? ' ' + money(x.value) : ''}</span>${x.details?.timingAsked && x.status !== 'booked' ? '<span class="pill timing">Asked timing</span>' : ''}</span>
+    </button>`;
+}
+
 function messageLabel(m, c) {
-  const base = { auto: 'Auto-text', followup: 'Follow-up', assistant: 'Assistant', owner: 'You', customer: who(c) }[m.from] || m.from;
+  const base = { auto: 'Auto-text', followup: 'Follow-up', assistant: 'AI assistant', owner: 'You', customer: who(c) }[m.from] || m.from;
   return m.status === 'failed' || m.status === 'undelivered' ? base + ' · not delivered' : base;
 }
 
 function threadHtml(c) {
+  const nameForm = `<form class="name-form" data-name="${c.id}"><label for="name-box" hidden>Customer name</label><input id="name-box" placeholder="Their name" maxlength="60" autocomplete="off" value="${esc(c.name || '')}"><button class="btn" type="submit">Save</button></form>`;
   return `
     <div class="thread">
       <div class="thread-head">
         <div class="thread-who">
-          ${c.name
-            ? `<b>${esc(c.name)}</b>`
-            : `<form class="name-form" data-name="${c.id}"><label for="name-box" hidden>Customer name</label><input id="name-box" placeholder="Add their name" maxlength="60" autocomplete="off"><button class="btn" type="submit">Save</button></form>`}
+          ${c.name && !editingName
+            ? `<span class="name-row"><b>${esc(c.name)}</b><button type="button" class="edit" data-edit-name aria-label="Edit name">Edit</button></span>`
+            : nameForm}
           <span class="thread-phone">#${esc(c.id)} · ${esc(c.phone)} · ${dayName(c.daysAgo)} ${esc(c.time)}</span>
         </div>
-        ${c.status === 'booked'
-          ? `<span class="booked-stamp">Booked ${money(c.value)}</span>`
-          : `<form class="book-form" data-book="${c.id}">
-               <label for="job-value" hidden>Job value</label>
-               <input id="job-value" inputmode="numeric" placeholder="Job $" aria-label="Job value in dollars">
-               <button class="btn btn-main" type="submit">Mark booked</button>
-             </form>`}
       </div>
-      ${c.summary ? `<div class="job-card${c.status === 'ready' ? ' ready' : ''}"><span>${c.status === 'ready' ? 'Ready to book' : 'Job details'}</span><p>${esc(c.summary)}</p></div>` : '<div></div>'}
       <div class="msgs" id="msgs">
         ${c.messages.map(m => `<div class="msg ${m.from}${m.status === 'failed' || m.status === 'undelivered' ? ' failed' : ''}"><p>${esc(m.text)}</p><small>${esc(messageLabel(m, c))}</small></div>`).join('')}
       </div>
@@ -465,6 +477,61 @@ function threadHtml(c) {
         <button class="btn btn-main" type="submit">Send</button>
       </form>
     </div>`;
+}
+
+// The right side: where this job stands, what to do next, and everything the AI found out.
+function jobPanel(c) {
+  const d = c.details;
+  const total = checklist().length;
+  const got = detailsIn(c);
+  const unsure = d ? checklist().filter(i => d.items[i.key] === 'not sure') : [];
+  const state = {
+    booked: ['Booked', `A ${money(c.value)} job. Clicked it by mistake? Undo puts it back.`],
+    ready: ['Ready to book', `Every detail is in. Text or call ${esc(firstName(c))} to set a time.`],
+    waiting: d?.timingAsked
+      ? ['Waiting on you', `${esc(firstName(c))} asked when someone can come. Text them a time.`]
+      : ['Waiting on you', `${esc(firstName(c))} texted and is waiting for your answer.`],
+    gathering: ['AI is asking', `${got} of ${total} details in. It keeps going until it has every one.`],
+    replied: ['You replied', 'Now waiting on them to answer.'],
+    'no-reply': ['No reply yet', "They got the auto-text but haven't written back."],
+    'opted-out': ['Texted STOP', "They opted out, so you can't text them anymore."]
+  }[c.status] || [STATUS[c.status] || c.status, ''];
+
+  return `
+    <aside class="job-panel" aria-label="Job">
+      <div class="state ${c.status}">
+        <span class="state-label">${state[0]}${c.status === 'booked' ? ' ' + money(c.value) : ''}</span>
+        <p>${state[1]}</p>
+        ${c.status === 'gathering' ? `<span class="meter" aria-hidden="true"><i style="width: ${Math.round(got / total * 100)}%"></i></span>` : ''}
+      </div>
+
+      <div class="actions">
+        <a class="btn" href="${telLink(c)}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>Call</a>
+        <button type="button" class="btn" data-focus-reply><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Text</button>
+      </div>
+      ${c.status === 'booked'
+        ? `<button type="button" class="btn undo" data-unbook="${c.id}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Undo booked</button>`
+        : `<form class="book-form" data-book="${c.id}">
+             <label for="job-value" hidden>Job value</label>
+             <input id="job-value" inputmode="numeric" placeholder="Job $" aria-label="Job value in dollars">
+             <button class="btn btn-main" type="submit">Mark booked</button>
+           </form>`}
+
+      ${d ? `
+        <div class="checklist">
+          <h3>Job details <span>${got}/${total}</span></h3>
+          ${d.done && unsure.length ? `<p class="unsure-note">Not sure about ${unsure.map(i => i.label.toLowerCase()).join(', ')}. Ask when you call.</p>` : ''}
+          <ul>
+            ${checklist().map(i => {
+              const v = d.items[i.key];
+              const kind = !v ? 'todo' : v === 'not sure' ? 'unsure' : 'got';
+              const shown = kind === 'got' ? esc(v) : kind === 'unsure' ? 'Not sure' : c.status === 'gathering' ? 'Still asking…' : 'Not given';
+              return `<li class="${kind}"><span class="tick" aria-hidden="true"></span><span class="lbl">${esc(i.label)}</span><b>${shown}</b></li>`;
+            }).join('')}
+          </ul>
+        </div>`
+      : c.summary ? `<div class="checklist"><h3>Job details</h3><p class="plain-summary">${esc(c.summary)}</p></div>` : ''}
+    </aside>`;
 }
 
 // ---------- Page: Settings ----------
@@ -515,7 +582,10 @@ function autotextPage() {
           </div>`)}
 
         ${section('04', 'Assistant and alerts', `
-          <label class="toggle" for="intake-on"><input type="checkbox" id="intake-on" ${a.intakeOn ? 'checked' : ''}>Ask callers for the job details first (name, address, how urgent, best time), then text me one summary</label>
+          <label class="toggle" for="intake-on"><input type="checkbox" id="intake-on" ${a.intakeOn ? 'checked' : ''}>Have the AI get every job detail first, then text me one summary</label>
+          <ol class="checklist-chips" aria-label="What the AI gets from every caller">
+            ${checklist().map(i => `<li>${esc(i.label)}</li>`).join('')}
+          </ol>
           <label class="toggle" for="notify-on"><input type="checkbox" id="notify-on" ${a.notifyOwner ? 'checked' : ''}>Text me at ${esc(data.business.ownerPhone)} when a customer replies</label>
           <div class="summary-row">
             <label class="toggle" for="summary-on"><input type="checkbox" id="summary-on" ${a.summaryOn ? 'checked' : ''}>Text me a morning summary at</label>
@@ -721,9 +791,19 @@ main.addEventListener('click', async e => {
   const open = e.target.closest('[data-open]');
   if (open) {
     openId = Number(open.dataset.open);
+    editingName = false;
     if (location.hash === '#conversations') { e.preventDefault(); render(); }
     return;
   }
+  if (e.target.closest('[data-edit-name]')) {
+    editingName = true;
+    render();
+    document.getElementById('name-box')?.focus();
+    return;
+  }
+  if (e.target.closest('[data-focus-reply]')) { document.getElementById('reply-box')?.focus(); return; }
+  const unbook = e.target.closest('[data-unbook]');
+  if (unbook) { await undoBooked(Number(unbook.dataset.unbook)); return; }
   const f = e.target.closest('[data-filter]');
   if (f) { filter = f.dataset.filter; render(); return; }
   const pv = e.target.closest('[data-preview]');
@@ -784,7 +864,7 @@ main.addEventListener('submit', async e => {
       await refresh();
     } else if (form.dataset.test === 'text') {
       const r = await api('/api/test/customer-text', { phone: document.getElementById('test-phone').value, text: document.getElementById('test-text').value });
-      toast(r.optedOut ? 'They texted STOP. No more texts will go to this number.' : r.assistant === 'ready' ? 'Ready to book. The owner got the summary.' : r.assistant ? 'The assistant asked the next question.' : 'Customer reply received.');
+      toast(r.optedOut ? 'They texted STOP. No more texts will go to this number.' : r.assistant === 'ready' ? 'Every detail is in. The owner got the summary.' : r.assistant === 'waiting' ? 'Every detail is in. They asked about timing, so the owner is up.' : r.assistant ? 'The AI asked the next question.' : 'Customer reply received.');
       await refresh();
     } else if (form.dataset.test === 'owner') {
       const r = await api('/api/test/owner-text', { text: document.getElementById('test-owner').value });
@@ -838,10 +918,28 @@ async function markBooked(form) {
   toast('Marked as booked.');
 }
 
+async function undoBooked(id) {
+  try {
+    if (mode === 'example') {
+      const c = data.conversations.find(x => x.id === id);
+      c.status = c.details?.done && !c.details.timingAsked ? 'ready' : 'waiting';
+      c.value = 0;
+      render();
+    } else {
+      await api(`/api/conversations/${id}/unbook`, {});
+      await refresh();
+    }
+    toast('Undone. It is not booked anymore.');
+  } catch (err) {
+    toast(err.message, true);
+  }
+}
+
 async function saveName(form) {
   const name = form.querySelector('input').value.trim();
   if (!name) return;
   const id = Number(form.dataset.name);
+  editingName = false;
   if (mode === 'example') {
     data.conversations.find(x => x.id === id).name = name;
     render();

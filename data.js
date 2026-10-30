@@ -23,6 +23,8 @@ window.RL_DATA = {
     afterHoursMessage: "Hi! This is {business}. We're closed right now, but we got your call. Tell us what's going on and we'll text you first thing in the morning.",
     contactLine: "18 Barton St E, Hamilton ON, delgadoplumbing.ca",
     notifyOwner: true,
+    followUpOn: true,
+    followUpMessage: "Hi, it's {business} again. Just checking in, do you still need a hand? Reply here anytime.",
     summaryOn: true,
     summaryTime: "7:00 AM"
   },

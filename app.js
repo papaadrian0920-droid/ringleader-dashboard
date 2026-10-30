@@ -187,6 +187,11 @@ function testPanel() {
         <input id="test-owner" value="${esc(testInputs.owner)}" autocomplete="off">
         <button class="btn" type="submit">Simulate your text</button>
       </form>
+      <form class="test-row" data-test="followup">
+        <span class="label-like">Next-day follow-up</span>
+        <p class="summary-preview">Pretend a day has passed: everyone who never wrote back gets the follow-up.</p>
+        <button class="btn" type="submit">Send follow-ups now</button>
+      </form>
       <form class="test-row" data-test="summary">
         <span class="label-like">Morning summary</span>
         <p class="summary-preview">${testInputs.summary ? esc(testInputs.summary) : 'See what the owner would get if the summary went out right now.'}</p>
@@ -273,7 +278,7 @@ function conversationsPage() {
 }
 
 function messageLabel(m, c) {
-  const base = { auto: 'Auto-text', owner: 'You', customer: who(c) }[m.from] || m.from;
+  const base = { auto: 'Auto-text', followup: 'Follow-up', owner: 'You', customer: who(c) }[m.from] || m.from;
   return m.status === 'failed' || m.status === 'undelivered' ? base + ' · not delivered' : base;
 }
 
@@ -338,6 +343,12 @@ function autotextPage() {
           <label class="toggle" for="ah-on"><input type="checkbox" id="ah-on" ${a.afterHoursOn ? 'checked' : ''}>Send a different text when you're closed</label>
           <textarea id="msg-after" maxlength="480" ${a.afterHoursOn ? '' : 'disabled'}>${esc(a.afterHoursMessage)}</textarea>
           <div class="meta" id="meta-after"></div>
+        </div>
+
+        <div class="field">
+          <label class="toggle" for="fu-on"><input type="checkbox" id="fu-on" ${a.followUpOn ? 'checked' : ''}>Follow up the next day if they don't reply</label>
+          <textarea id="msg-follow" maxlength="480" ${a.followUpOn ? '' : 'disabled'}>${esc(a.followUpMessage || '')}</textarea>
+          <p class="note">Sent once, about a day after the auto-text, while you're open. Skipped if they wrote back, you texted them, or they texted STOP.</p>
         </div>
 
         <div class="field">
@@ -415,6 +426,8 @@ function readSettingsForm() {
     afterHoursOn: document.getElementById('ah-on').checked,
     contactLine: document.getElementById('contact-line').value,
     notifyOwner: document.getElementById('notify-on').checked,
+    followUpOn: document.getElementById('fu-on').checked,
+    followUpMessage: document.getElementById('msg-follow').value,
     summaryOn: document.getElementById('summary-on').checked,
     summaryTime: document.getElementById('summary-time').value,
     hours: data.hours.map((h, i) => document.getElementById('open-' + i).checked
@@ -550,6 +563,7 @@ main.addEventListener('input', e => {
   if (e.target.id === 'test-owner') testInputs.owner = e.target.value;
   if (e.target.id === 'summary-on') document.getElementById('summary-time').disabled = !e.target.checked;
   if (e.target.id === 'msg-main' || e.target.id === 'msg-after' || e.target.id === 'contact-line') updateAutotext();
+  if (e.target.id === 'fu-on') document.getElementById('msg-follow').disabled = !e.target.checked;
   if (e.target.id === 'ah-on') {
     document.getElementById('msg-after').disabled = !e.target.checked;
     updateAutotext();
@@ -581,6 +595,10 @@ main.addEventListener('submit', async e => {
     } else if (form.dataset.test === 'owner') {
       const r = await api('/api/test/owner-text', { text: document.getElementById('test-owner').value });
       toast(r.sent ? `Your text went to #${r.conversationId}.` : 'Not sent: ' + (r.error || 'nobody to send it to. Check the # number, or simulate a customer reply first.'), !r.sent);
+      await refresh();
+    } else if (form.dataset.test === 'followup') {
+      const r = await api('/api/test/follow-ups', {});
+      toast(r.reason === 'off' ? 'Follow-ups are turned off on the Auto-text page.' : r.sent ? `Sent ${r.sent} follow-up${r.sent === 1 ? '' : 's'}.` : 'Nobody needs a follow-up. Simulate a missed call first, and don\'t reply to it.');
       await refresh();
     } else if (form.dataset.test === 'summary') {
       const r = await api('/api/test/morning-summary', {});

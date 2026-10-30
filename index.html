@@ -4,49 +4,48 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Ringleader Dashboard</title>
+  <meta name="theme-color" content="#0B0B0C">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..900&family=IBM+Plex+Mono:wght@400;500;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..900&family=IBM+Plex+Mono:wght@500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <a class="skip" href="#main">Skip to content</a>
   <div class="app">
-    <!-- Left menu. Each plan gets its own group. -->
-    <aside class="side">
-      <div class="brand">
+    <!-- Top bar. On phones the menu moves to the bottom of the screen. -->
+    <header class="bar">
+      <a class="logo" href="#overview" aria-label="Ringleader home">
         <span class="logo-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>
         </span>
-        <div>
-          <b>Ringleader</b>
-          <span id="biz-name">Business</span>
-        </div>
-      </div>
+        <span class="logo-text">Ringleader</span>
+      </a>
+      <span class="biz" id="biz-name">Business</span>
 
       <nav class="nav" aria-label="Dashboard">
-        <div class="nav-group">
-          <p class="nav-plan">Text-Back <span class="plan-tag on">Active</span></p>
-          <a href="#overview" data-page="overview">Overview</a>
-          <a href="#conversations" data-page="conversations">Conversations <span class="count" id="waiting-count"></span></a>
-          <a href="#autotext" data-page="autotext">Auto-text</a>
-        </div>
-        <div class="nav-group">
-          <p class="nav-plan">Front Desk <span class="plan-tag">Soon</span></p>
-          <a href="#frontdesk" data-page="frontdesk">What it adds</a>
-        </div>
-        <div class="nav-group">
-          <p class="nav-plan">Crew <span class="plan-tag">Soon</span></p>
-          <a href="#crew" data-page="crew">What it adds</a>
-        </div>
+        <a href="#overview" data-page="overview">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Today
+        </a>
+        <a href="#conversations" data-page="conversations">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Texts<span class="count" id="waiting-count"></span>
+        </a>
+        <a href="#autotext" data-page="autotext">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Settings
+        </a>
+        <a href="#frontdesk" data-page="frontdesk">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>Next up
+        </a>
       </nav>
 
-      <p class="side-foot" id="side-foot"></p>
-    </aside>
+      <span class="mode" id="side-foot"></span>
+    </header>
 
     <!-- app.js draws the current page in here -->
     <main class="main" id="main"></main>
   </div>
 
+  <div class="tip" id="tip" role="tooltip" hidden></div>
   <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
 
   <script src="data.js"></script>

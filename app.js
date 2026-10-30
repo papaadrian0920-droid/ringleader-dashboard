@@ -1,7 +1,7 @@
 // Ringleader dashboard
 // Gets its data from the server (/api/dashboard) and draws one page at a time.
 // If there's no server (you opened the file by itself), it shows the example data from data.js.
-// The page shown depends on the end of the address: #overview, #conversations, #autotext, #frontdesk, #crew.
+// The page shown depends on the end of the address: #overview, #conversations, #autotext, #frontdesk.
 
 let data = window.RL_DATA;
 let mode = 'example'; // 'example' = no server, 'test' = server without Twilio keys, 'live' = real texts
@@ -47,6 +47,7 @@ function dayName(daysAgo) {
 
 const who = c => c.name || c.phone;
 const lastText = c => c.messages.length ? c.messages[c.messages.length - 1].text : '';
+const lastCustomerText = c => [...c.messages].reverse().find(m => m.from === 'customer')?.text || lastText(c);
 const customerReplied = c => c.messages.some(m => m.from === 'customer');
 const thisWeek = () => data.conversations.filter(c => c.daysAgo <= 6);
 
@@ -66,6 +67,8 @@ function toast(text, isError) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
 }
+
+const arrow = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`;
 
 // ---------- Talking to the server ----------
 
@@ -107,62 +110,249 @@ function stats() {
   };
 }
 
-const pct = (part, whole) => whole ? Math.round((part / whole) * 100) + '%' : '–';
+const pct = (part, whole) => whole ? Math.round((part / whole) * 100) : 0;
 
-// ---------- Page: Overview ----------
+// The last 7 days, oldest first, each with its conversations.
+function weekDays() {
+  return [6, 5, 4, 3, 2, 1, 0].map(ago => ({
+    ago,
+    label: ago === 0 ? 'Today' : new Date(Date.now() - ago * 864e5).toLocaleDateString('en-US', { weekday: 'short' }),
+    list: data.conversations.filter(c => c.daysAgo === ago)
+  }));
+}
+
+// A smooth line through points (so the chart curves instead of zig-zagging).
+function smoothPath(pts) {
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [x0, y0] = pts[i - 1] || pts[i], [x1, y1] = pts[i], [x2, y2] = pts[i + 1], [x3, y3] = pts[i + 2] || pts[i + 1];
+    const c1 = [x1 + (x2 - x0) / 6, y1 + (y2 - y0) / 6], c2 = [x2 - (x3 - x1) / 6, y2 - (y3 - y1) / 6];
+    // Keep the curve from dipping below a flat stretch.
+    c1[1] = Math.min(Math.max(c1[1], Math.min(y1, y2)), Math.max(y1, y2));
+    c2[1] = Math.min(Math.max(c2[1], Math.min(y1, y2)), Math.max(y1, y2));
+    d += ` C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${x2},${y2}`;
+  }
+  return d;
+}
+
+// ---------- Page: Today ----------
 
 function overviewPage() {
   const s = stats();
-  const waiting = data.conversations.filter(needsYou);
-  const recent = data.conversations.filter(c => !needsYou(c)).slice(0, 6);
+  const needs = data.conversations.filter(needsYou).sort((a, b) => (b.status === 'ready') - (a.status === 'ready'));
+  const recent = data.conversations.filter(c => !needsYou(c)).slice(0, 7);
   const statusLine = mode === 'live'
     ? `Text-Back is on. Calls you miss on ${esc(data.business.ownerPhone)} get a text in about 5 seconds.`
     : mode === 'test'
-      ? 'Test mode. Nothing is really sent. Use the buttons below to try it.'
-      : `Example data. Calls you miss on ${esc(data.business.ownerPhone)} would get a text in about 5 seconds.`;
+      ? 'Test mode. Nothing is really sent. Open the simulator to try it.'
+      : 'Example data. Start the server to see your real calls.';
 
   return `
-    <header class="page-head">
-      <p class="label">Text-Back · last 7 days</p>
-      <h1>${esc(greeting())}</h1>
-      <p class="status-line"><span class="dot ${mode === 'live' ? '' : 'off'}"></span>${statusLine}</p>
-    </header>
+    <section class="hero" aria-label="This week">
+      <div class="hero-copy">
+        <p class="kicker"><span class="pulse"></span>Last 7 days</p>
+        <h1>${esc(greeting())}</h1>
+        <p class="hero-money" data-count="${s.money}">${money(s.money)}</p>
+        <p class="hero-sub">${s.money ? `in jobs booked from <span class="hi">calls you missed</span>.` : 'in booked jobs so far. They stack up here as calls turn into work.'}</p>
+        <p class="status-line">${statusLine}</p>
+      </div>
+      <div class="hero-chart">${heroChart()}</div>
+    </section>
+
+    ${tickerHtml()}
 
     ${mode === 'test' ? testPanel() : ''}
 
-    <section class="block" aria-label="This week's results">
-      <div class="flow">
-        <div><b>${s.missed}</b><span>Missed calls</span></div>
-        <div><b>${s.texted}</b><span>Got a text back</span><span class="pct">${pct(s.texted, s.missed)}</span></div>
-        <div><b>${s.replied}</b><span>Texted you back</span><span class="pct">${pct(s.replied, s.texted)}</span></div>
-        <div><b>${s.booked}</b><span>Booked jobs</span><span class="pct">${pct(s.booked, s.replied)}</span></div>
+    <section aria-label="Needs you">
+      <div class="needs-head">
+        ${needs.length ? `<span class="big-count">${needs.length}</span><h2>${needs.length === 1 ? 'job needs' : 'jobs need'} you</h2>` : ''}
       </div>
-      <p class="money"><b>${money(s.money)}</b><span>in jobs booked from calls you would have missed</span></p>
+      ${needs.length
+        ? `<div class="needs-grid">${needs.map(jobCard).join('')}</div>`
+        : `<div class="all-clear"><b>All clear.</b><p class="empty">Nobody is waiting on you. New texts show up here.</p></div>`}
     </section>
 
-    <section class="block">
-      <div class="block-head">
-        <h2>Waiting on you</h2>
-        ${waiting.length ? `<a class="link" href="#conversations">Open conversations</a>` : ''}
+    <section class="grid-2">
+      <div class="card">
+        <div class="card-head"><h2>Missed call <span class="hi">&rarr;</span> booked job</h2></div>
+        ${funnelHtml(s)}
       </div>
-      ${waiting.length ? `<div class="rows">${waiting.map(rowHtml).join('')}</div>`
-        : `<p class="empty">You're all caught up.</p>`}
+      <div class="card">
+        <div class="card-head"><h2>How it's going</h2></div>
+        ${ringsHtml(s)}
+      </div>
     </section>
 
-    <section class="block chart">
-      <div class="block-head">
+    <section class="card week">
+      <div class="card-head">
         <h2>Missed calls by day</h2>
-        <div class="legend"><span><i style="background: var(--ink)"></i>Texted you back</span><span><i style="background: var(--bar)"></i>No reply</span></div>
+        <div class="legend">
+          <span><i style="background: var(--hivis)"></i>Booked</span>
+          <span><i style="background: var(--mid)"></i>Texted back</span>
+          <span><i style="background: var(--dim)"></i>No reply</span>
+        </div>
       </div>
-      ${chartSvg()}
+      ${weekChart()}
     </section>
 
-    <section class="block">
-      <h2>Recent</h2>
-      ${recent.length ? `<div class="rows">${recent.map(rowHtml).join('')}</div>`
+    <section class="card">
+      <div class="card-head"><h2>Recent</h2>${recent.length ? `<a class="link" href="#conversations">All texts &rarr;</a>` : ''}</div>
+      ${recent.length ? `<div class="feed">${recent.map(feedRow).join('')}</div>`
         : `<p class="empty">No missed calls yet. When a call is missed, it shows up here.</p>`}
     </section>
   `;
+}
+
+// The green ticker of what just happened, newest first.
+function tickerHtml() {
+  const events = data.conversations.slice(0, 10).map(c => ({
+    booked: `${who(c)} booked ${money(c.value)}`,
+    ready: `${who(c)} is ready to book`,
+    waiting: `${who(c)} texted back`,
+    gathering: `Getting details from ${who(c)}`,
+    replied: `You replied to ${who(c)}`,
+    'no-reply': `Missed call from ${c.phone}, texted back`,
+    'opted-out': `${who(c)} opted out`
+  }[c.status] || who(c)));
+  const items = events.length ? events : ['Waiting for the first missed call', 'Every missed call gets a text in seconds'];
+  const row = items.map(t => `<span>${esc(t)}</span>`).join('');
+  return `<div class="ticker" aria-hidden="true"><div class="ticker-track">${row}${row}</div></div>`;
+}
+
+// A big card for someone the owner should answer.
+function jobCard(c) {
+  const ready = c.status === 'ready';
+  return `
+    <a class="job ${ready ? 'ready' : ''}" href="#conversations" data-open="${c.id}">
+      <span class="job-top"><span class="pill ${c.status}">${STATUS[c.status]}</span><time>${dayName(c.daysAgo)} ${esc(c.time)}</time></span>
+      <span class="quote">${esc(ready && c.summary ? c.summary : '“' + lastCustomerText(c) + '”')}</span>
+      <span class="who">${esc(who(c))}<span class="go">${arrow}</span></span>
+    </a>`;
+}
+
+function feedRow(c) {
+  return `
+    <a href="#conversations" data-open="${c.id}">
+      <span class="dot ${c.status}"></span>
+      <span><b>${esc(who(c))}</b><p>${esc(lastText(c))}</p></span>
+      <span class="side"><span class="pill ${c.status}">${STATUS[c.status]}${c.status === 'booked' ? ' ' + money(c.value) : ''}</span><time>${dayName(c.daysAgo)} ${esc(c.time)}</time></span>
+    </a>`;
+}
+
+// Hero chart: booked dollars adding up over the week.
+function heroChart() {
+  const days = weekDays();
+  let total = 0;
+  const daily = days.map(d => d.list.filter(c => c.status === 'booked').reduce((sum, c) => sum + c.value, 0));
+  const running = daily.map(v => (total += v));
+  const W = 560, H = 250, P = 14, B = 34;
+  const max = Math.max(...running, 1);
+  const x = i => P + i * (W - 2 * P) / 6;
+  const y = v => P + (H - P - B) * (1 - v / max);
+  const pts = running.map((v, i) => [x(i), y(v)]);
+  const line = smoothPath(pts);
+  const area = `${line} L${x(6)},${y(0)} L${x(0)},${y(0)} Z`;
+  const last = pts[6];
+  const hits = days.map((d, i) => `<rect x="${x(i) - (W - 2 * P) / 12}" y="0" width="${(W - 2 * P) / 6}" height="${H}" fill="transparent" data-tip="${esc(d.label)}: ${money(daily[i])} booked, ${money(running[i])} so far"/>`).join('');
+  return `
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Booked dollars adding up over the last 7 days, ${money(total)} in total">
+      <defs>
+        <linearGradient id="heroFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#C8FF2E" stop-opacity=".45"/>
+          <stop offset="1" stop-color="#C8FF2E" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <line x1="${P}" x2="${W - P}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)" stroke-width="1"/>
+      <path class="fade-in" d="${area}" fill="url(#heroFill)"/>
+      <path class="draw" d="${line}" fill="none" stroke="#C8FF2E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      ${pts.map(([px, py], i) => daily[i] ? `<circle class="fade-in" cx="${px}" cy="${py}" r="4.5" fill="var(--bg)" stroke="#C8FF2E" stroke-width="2"/>` : '').join('')}
+      <circle class="fade-in" cx="${last[0]}" cy="${last[1]}" r="16" fill="#C8FF2E" opacity=".18"/>
+      <circle class="fade-in" cx="${last[0]}" cy="${last[1]}" r="7" fill="#C8FF2E"/>
+      ${days.map((d, i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="13" font-weight="600" fill="var(--soft)" font-family="IBM Plex Mono, monospace">${esc(d.label)}</text>`).join('')}
+      ${hits}
+    </svg>`;
+}
+
+// Funnel: missed calls, texted back, wrote back, booked.
+function funnelHtml(s) {
+  const rows = [
+    ['Missed calls', s.missed, 'var(--dim)'],
+    ['Got a text back', s.texted, '#5C5C63'],
+    ['Texted you back', s.replied, 'var(--mid)'],
+    ['Booked a job', s.booked, 'var(--hivis)']
+  ];
+  const steps = [`${pct(s.texted, s.missed)}% got a text in seconds`, `${pct(s.replied, s.texted)}% wrote back`, `${pct(s.booked, s.replied)}% turned into jobs`];
+  return `<div class="funnel">${rows.map(([label, n, color], i) => `
+    <div class="f-row ${i === 3 ? 'win' : ''}" data-tip="${esc(label)}: ${n}">
+      <div class="f-text"><span>${label}</span><b class="f-num">${n}</b></div>
+      <div class="f-bar"><i class="f-fill" style="--w: ${s.missed ? Math.max(n ? 3 : 0, (n / s.missed) * 100) : 0}%; --c: ${color}; --i: ${i}"></i></div>
+    </div>${i < 3 ? `<p class="f-step">${steps[i]}</p>` : ''}`).join('')}
+  </div>`;
+}
+
+// Two rings (reply rate, booking rate) and two numbers.
+function ringsHtml(s) {
+  const ring = (value, label, sub) => {
+    const r = 52, C = 2 * Math.PI * r;
+    return `
+      <div class="ring" data-tip="${esc(label)}: ${value}%">
+        <div class="ring-wrap">
+          <svg viewBox="0 0 132 132" aria-hidden="true">
+            <circle cx="66" cy="66" r="${r}" fill="none" stroke="var(--panel-2)" stroke-width="14"/>
+            <circle class="arc" cx="66" cy="66" r="${r}" fill="none" stroke="#C8FF2E" stroke-width="14" stroke-linecap="round"
+              stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - value / 100)}" style="--full: ${C}"/>
+          </svg>
+          <span class="ring-num">${value}%</span>
+        </div>
+        <b>${label}</b><span>${sub}</span>
+      </div>`;
+  };
+  return `
+    <div class="rings">
+      ${ring(pct(s.replied, s.texted), 'Reply rate', 'of texted callers wrote back')}
+      ${ring(pct(s.booked, s.replied), 'Booking rate', 'of replies became jobs')}
+    </div>
+    <div class="tile-row">
+      <div class="tile"><b>${s.booked ? money(s.money / s.booked) : '$0'}</b><span>average job</span></div>
+      <div class="tile"><b>${s.replied}</b><span>callers saved from going to someone else</span></div>
+    </div>`;
+}
+
+// Stacked columns: booked (green), texted back (grey), no reply (dark).
+function weekChart() {
+  const days = weekDays().map(d => {
+    const booked = d.list.filter(c => c.status === 'booked').length;
+    const replied = d.list.filter(customerReplied).length - booked;
+    return { ...d, booked, replied: Math.max(0, replied), none: d.list.length - Math.max(booked, d.list.filter(customerReplied).length) };
+  });
+  const W = 960, H = 250, L = 30, B = 34, T = 30;
+  const max = Math.max(4, ...days.map(d => d.list.length));
+  const step = (W - L) / 7, bw = Math.min(64, step * 0.58);
+  const y = v => T + (H - T - B) * (1 - v / max);
+  const unit = (H - T - B) / max;
+  let svg = '';
+  const tickStep = max > 8 ? Math.ceil(max / 4) : 2;
+  for (let v = 0; v <= max; v += tickStep) {
+    svg += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-dasharray="${v ? '3 5' : ''}"/>`;
+    svg += `<text x="${L - 10}" y="${y(v) + 4}" text-anchor="end" font-size="12" font-weight="600" fill="var(--soft)" font-family="IBM Plex Mono, monospace">${v}</text>`;
+  }
+  days.forEach((d, i) => {
+    const x = L + i * step + (step - bw) / 2;
+    let base = y(0);
+    let col = '';
+    [[d.booked, '#C8FF2E'], [d.replied, '#8C8C86'], [d.none, '#3A3A40']].forEach(([n, color]) => {
+      if (!n) return;
+      const h = n * unit;
+      col += `<rect x="${x}" y="${base - h + 1}" width="${bw}" height="${Math.max(h - 2, 2)}" rx="6" fill="${color}"/>`;
+      base -= h;
+    });
+    const tip = `${d.label}: ${d.list.length} missed, ${d.booked + d.replied} texted back, ${d.booked} booked`;
+    svg += `<g class="col" style="--i: ${i}">${col}</g>`;
+    if (d.list.length) svg += `<text x="${x + bw / 2}" y="${y(d.list.length) - 10}" text-anchor="middle" font-size="18" font-weight="900" fill="var(--ink)" font-family="Archivo, sans-serif">${d.list.length}</text>`;
+    svg += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="13" font-weight="600" fill="${d.ago === 0 ? '#C8FF2E' : 'var(--soft)'}" font-family="IBM Plex Mono, monospace">${esc(d.label)}</text>`;
+    svg += `<rect x="${L + i * step}" y="0" width="${step}" height="${H}" fill="transparent" data-tip="${esc(tip)}"/>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Missed calls per day for the last 7 days">${svg}</svg>`;
 }
 
 // Only in test mode: pretend to be a caller.
@@ -171,81 +361,45 @@ const testInputs = {
   phone: '(555) 014-' + String(Math.floor(1000 + Math.random() * 9000)),
   text: 'Hi, my water heater is leaking. Can someone come today?',
   owner: 'I can be there at 2 today. Does that work?',
-  summary: ''
+  summary: '',
+  open: true
 };
 function testPanel() {
   return `
-    <section class="test-panel" aria-label="Test tools">
-      <p class="label">Try it</p>
-      <form class="test-row" data-test="call">
-        <label for="test-phone">Caller's number</label>
-        <input id="test-phone" value="${esc(testInputs.phone)}" autocomplete="off">
-        <button class="btn btn-main" type="submit">Simulate missed call</button>
-      </form>
-      <form class="test-row" data-test="text">
-        <label for="test-text">They text back</label>
-        <input id="test-text" value="${esc(testInputs.text)}" autocomplete="off">
-        <button class="btn" type="submit">Simulate customer reply</button>
-      </form>
-      <form class="test-row" data-test="owner">
-        <label for="test-owner">You text back from your phone</label>
-        <input id="test-owner" value="${esc(testInputs.owner)}" autocomplete="off">
-        <button class="btn" type="submit">Simulate your text</button>
-      </form>
-      <form class="test-row" data-test="followup">
-        <span class="label-like">Next-day follow-up</span>
-        <p class="summary-preview">Pretend a day has passed: everyone who never wrote back gets the follow-up.</p>
-        <button class="btn" type="submit">Send follow-ups now</button>
-      </form>
-      <form class="test-row" data-test="summary">
-        <span class="label-like">Morning summary</span>
-        <p class="summary-preview">${testInputs.summary ? esc(testInputs.summary) : 'See what the owner would get if the summary went out right now.'}</p>
-        <button class="btn" type="submit">Preview summary</button>
-      </form>
-      <p class="note">The reply comes from the caller's number above. Try calling twice (only one text goes out), or texting STOP. Your text goes to whoever texted last, or start it with # and a number, like #3, to pick someone.</p>
-    </section>`;
+    <details class="sim" ${testInputs.open ? 'open' : ''}>
+      <summary>Simulator <span class="tape" aria-hidden="true"></span><svg class="chev" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+      <div class="sim-body">
+        <form class="test-row" data-test="call">
+          <label for="test-phone">Caller's number</label>
+          <input id="test-phone" value="${esc(testInputs.phone)}" autocomplete="off">
+          <button class="btn btn-main" type="submit">Simulate missed call</button>
+        </form>
+        <form class="test-row" data-test="text">
+          <label for="test-text">They text back</label>
+          <input id="test-text" value="${esc(testInputs.text)}" autocomplete="off">
+          <button class="btn" type="submit">Simulate customer reply</button>
+        </form>
+        <form class="test-row" data-test="owner">
+          <label for="test-owner">You text from your phone</label>
+          <input id="test-owner" value="${esc(testInputs.owner)}" autocomplete="off">
+          <button class="btn" type="submit">Simulate your text</button>
+        </form>
+        <form class="test-row" data-test="followup">
+          <span class="label-like">Next-day follow-up</span>
+          <p class="summary-preview">Pretend a day passed: everyone who never wrote back gets it.</p>
+          <button class="btn" type="submit">Send follow-ups now</button>
+        </form>
+        <form class="test-row" data-test="summary">
+          <span class="label-like">Morning summary</span>
+          <p class="summary-preview">${testInputs.summary ? esc(testInputs.summary) : 'What the owner would get if it went out right now.'}</p>
+          <button class="btn" type="submit">Preview summary</button>
+        </form>
+        <p class="note">Replies come from the caller's number above. Try calling twice (only one text goes out), or texting STOP. Your text goes to whoever texted last, or start it with # and a number, like #3.</p>
+      </div>
+    </details>`;
 }
 
-function rowHtml(c) {
-  return `
-    <a class="row" href="#conversations" data-open="${c.id}">
-      <span class="row-main">
-        <span class="row-who">${esc(who(c))}${c.name ? `<small>${esc(c.phone)}</small>` : ''}</span>
-        <span class="row-text">${esc(lastText(c))}</span>
-      </span>
-      <span class="row-side">
-        <span class="pill ${c.status}">${STATUS[c.status]}${c.status === 'booked' ? ' · ' + money(c.value) : ''}</span>
-        <time>${dayName(c.daysAgo)} ${esc(c.time)}</time>
-      </span>
-    </a>`;
-}
-
-// A simple stacked bar chart: dark part = customer texted back, grey part = no reply.
-function chartSvg() {
-  const days = [6, 5, 4, 3, 2, 1, 0].map(ago => {
-    const list = data.conversations.filter(c => c.daysAgo === ago);
-    return { label: ago === 0 ? 'Today' : dayName(ago).slice(0, 3), total: list.length, replied: list.filter(customerReplied).length };
-  });
-  const W = 640, H = 200, L = 28, B = 28, T = 12;
-  const max = Math.ceil(Math.max(4, ...days.map(d => d.total)) / 2) * 2;
-  const step = (W - L) / days.length;
-  const bw = step * 0.5;
-  const y = v => T + (H - T - B) * (1 - v / max);
-  let svg = '';
-  for (let v = 0; v <= max; v += max > 10 ? 4 : 2) {
-    svg += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/>`;
-    svg += `<text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--faint)" font-family="IBM Plex Mono, monospace">${v}</text>`;
-  }
-  days.forEach((d, i) => {
-    const x = L + i * step + (step - bw) / 2;
-    if (d.total) svg += `<rect x="${x}" y="${y(d.total)}" width="${bw}" height="${y(0) - y(d.total)}" rx="3" fill="var(--bar)"><title>${d.label}: ${d.total} missed</title></rect>`;
-    if (d.replied) svg += `<rect x="${x}" y="${y(d.replied)}" width="${bw}" height="${y(0) - y(d.replied)}" rx="3" fill="var(--ink)"><title>${d.label}: ${d.replied} texted back</title></rect>`;
-    svg += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${d.label}</text>`;
-  });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Missed calls per day for the last 7 days">${svg}</svg>`;
-}
-
-// ---------- Page: Conversations ----------
+// ---------- Page: Texts ----------
 
 let filter = 'all';
 let openId = null;
@@ -257,27 +411,23 @@ function conversationsPage() {
   const c = data.conversations.find(x => x.id === openId);
 
   return `
-    <header class="page-head">
-      <p class="label">Text-Back</p>
-      <h1>Conversations</h1>
-      <p class="status-line">Every missed call starts a text conversation. Reply here and it texts the customer from ${esc(data.business.ringleaderNumber || 'your Ringleader number')}.</p>
+    <header class="page-top">
+      <h1 class="page-title">Texts<span class="hi">.</span></h1>
+      <div class="tabs" role="group" aria-label="Filter conversations">
+        ${['all', 'waiting', 'booked'].map(f => `<button type="button" data-filter="${f}" aria-pressed="${filter === f}">${f === 'all' ? 'All' : f === 'waiting' ? 'Needs you' : 'Booked'}</button>`).join('')}
+      </div>
     </header>
 
-    <section class="block">
-      <div class="tabs" role="group" aria-label="Filter conversations">
-        ${['all', 'waiting', 'booked'].map(f => `<button type="button" data-filter="${f}" aria-pressed="${filter === f}">${f === 'all' ? 'All' : f === 'waiting' ? 'Waiting on you' : 'Booked'}</button>`).join('')}
+    <section class="inbox">
+      <div class="inbox-list">
+        ${list.length ? list.map(x => `
+          <button type="button" data-open="${x.id}" class="${x.id === openId ? 'active' : ''}">
+            <span class="top"><b>${esc(who(x))}</b><time>${dayName(x.daysAgo)}</time></span>
+            <span class="preview">${esc(lastText(x))}</span>
+            <span><span class="pill ${x.status}">${STATUS[x.status]}${x.status === 'booked' ? ' ' + money(x.value) : ''}</span></span>
+          </button>`).join('') : `<p class="empty" style="padding: 14px">Nothing here yet.</p>`}
       </div>
-      <div class="inbox">
-        <div class="inbox-list">
-          ${list.length ? list.map(x => `
-            <button type="button" data-open="${x.id}" class="${x.id === openId ? 'active' : ''}">
-              <span class="top"><b>${esc(who(x))}</b><time>${dayName(x.daysAgo)}</time></span>
-              <span class="preview">${esc(lastText(x))}</span>
-              <span><span class="pill ${x.status}">${STATUS[x.status]}</span></span>
-            </button>`).join('') : `<p class="empty" style="padding: 14px">Nothing here yet.</p>`}
-        </div>
-        ${c ? threadHtml(c) : `<div class="thread"><p class="empty" style="padding: 20px">Pick a conversation.</p></div>`}
-      </div>
+      ${c ? threadHtml(c) : `<div class="thread"><p class="empty" style="padding: 24px">Pick a conversation.</p></div>`}
     </section>
   `;
 }
@@ -291,23 +441,21 @@ function threadHtml(c) {
   return `
     <div class="thread">
       <div class="thread-head">
-        <div>
+        <div class="thread-who">
           ${c.name
             ? `<b>${esc(c.name)}</b>`
             : `<form class="name-form" data-name="${c.id}"><label for="name-box" hidden>Customer name</label><input id="name-box" placeholder="Add their name" maxlength="60" autocomplete="off"><button class="btn" type="submit">Save</button></form>`}
           <span class="thread-phone">#${esc(c.id)} · ${esc(c.phone)} · ${dayName(c.daysAgo)} ${esc(c.time)}</span>
         </div>
-        <div class="thread-actions">
-          ${c.status === 'booked'
-            ? `<span class="pill booked">Booked · ${money(c.value)}</span>`
-            : `<form class="book-form" data-book="${c.id}">
-                 <label for="job-value" hidden>Job value</label>
-                 <input id="job-value" inputmode="numeric" placeholder="Job $" aria-label="Job value in dollars">
-                 <button class="btn" type="submit">Mark booked</button>
-               </form>`}
-        </div>
+        ${c.status === 'booked'
+          ? `<span class="booked-stamp">Booked ${money(c.value)}</span>`
+          : `<form class="book-form" data-book="${c.id}">
+               <label for="job-value" hidden>Job value</label>
+               <input id="job-value" inputmode="numeric" placeholder="Job $" aria-label="Job value in dollars">
+               <button class="btn btn-main" type="submit">Mark booked</button>
+             </form>`}
       </div>
-      ${c.summary ? `<div class="job-card${c.status === 'ready' ? ' ready' : ''}"><span>${c.status === 'ready' ? 'Ready to book' : 'Job details so far'}</span><p>${esc(c.summary)}</p></div>` : ''}
+      ${c.summary ? `<div class="job-card${c.status === 'ready' ? ' ready' : ''}"><span>${c.status === 'ready' ? 'Ready to book' : 'Job details'}</span><p>${esc(c.summary)}</p></div>` : '<div></div>'}
       <div class="msgs" id="msgs">
         ${c.messages.map(m => `<div class="msg ${m.from}${m.status === 'failed' || m.status === 'undelivered' ? ' failed' : ''}"><p>${esc(m.text)}</p><small>${esc(messageLabel(m, c))}</small></div>`).join('')}
       </div>
@@ -319,7 +467,7 @@ function threadHtml(c) {
     </div>`;
 }
 
-// ---------- Page: Auto-text settings ----------
+// ---------- Page: Settings ----------
 
 // Texts are sent in 160-character pieces (70 if the message has emoji or special symbols).
 function textPieces(message) {
@@ -330,50 +478,51 @@ function textPieces(message) {
 
 function autotextPage() {
   const a = data.autoText;
+  const section = (n, title, body) => `
+    <section class="set"><span class="num" aria-hidden="true">${n}</span><div class="set-body"><h2>${title}</h2>${body}</div></section>`;
   return `
-    <header class="page-head">
-      <p class="label">Text-Back</p>
-      <h1>Auto-text</h1>
-      <p class="status-line">This is the text every missed caller gets. Write {business} and it fills in your company name. Your contact line and "Reply STOP to opt out." are added at the end.</p>
+    <header class="page-top">
+      <h1 class="page-title">Settings<span class="hi">.</span></h1>
     </header>
 
     <div class="settings">
-      <div class="block" style="gap: 28px">
-        <div class="field">
-          <label for="msg-main">When you're open</label>
-          <textarea id="msg-main" maxlength="480">${esc(a.message)}</textarea>
-          <div class="meta" id="meta-main"></div>
-        </div>
+      <div class="settings-main">
+        ${section('01', 'The first text', `
+          <p class="note">Every missed caller gets this. Write {business} and it fills in your company name.</p>
+          <div class="field">
+            <label for="msg-main">When you're open</label>
+            <textarea id="msg-main" maxlength="480">${esc(a.message)}</textarea>
+            <div class="meta" id="meta-main"></div>
+          </div>
+          <div class="field">
+            <label for="contact-line">Contact line</label>
+            <input id="contact-line" maxlength="160" value="${esc(a.contactLine || '')}" placeholder="12 King St W, Hamilton ON, mikesplumbing.ca">
+            <p class="note">Canada's anti-spam law (CASL) needs your mailing address and a phone, email or website in business texts. It goes at the end, before "Reply STOP to opt out." Plain keyboard characters only: one emoji makes every text cost double.</p>
+          </div>`)}
 
-        <div class="field">
+        ${section('02', 'When you’re closed', `
           <label class="toggle" for="ah-on"><input type="checkbox" id="ah-on" ${a.afterHoursOn ? 'checked' : ''}>Send a different text when you're closed</label>
-          <textarea id="msg-after" maxlength="480" ${a.afterHoursOn ? '' : 'disabled'}>${esc(a.afterHoursMessage)}</textarea>
-          <div class="meta" id="meta-after"></div>
-        </div>
+          <div class="field">
+            <textarea id="msg-after" maxlength="480" aria-label="Closed text" ${a.afterHoursOn ? '' : 'disabled'}>${esc(a.afterHoursMessage)}</textarea>
+            <div class="meta" id="meta-after"></div>
+          </div>`)}
 
-        <div class="field">
+        ${section('03', 'Next-day follow-up', `
           <label class="toggle" for="fu-on"><input type="checkbox" id="fu-on" ${a.followUpOn ? 'checked' : ''}>Follow up the next day if they don't reply</label>
-          <textarea id="msg-follow" maxlength="480" ${a.followUpOn ? '' : 'disabled'}>${esc(a.followUpMessage || '')}</textarea>
-          <p class="note">Sent once, about a day after the auto-text, while you're open. Skipped if they wrote back, you texted them, or they texted STOP.</p>
-        </div>
+          <div class="field">
+            <textarea id="msg-follow" maxlength="480" aria-label="Follow-up text" ${a.followUpOn ? '' : 'disabled'}>${esc(a.followUpMessage || '')}</textarea>
+            <p class="note">Sent once, about a day later, while you're open. Skipped if they wrote back, you texted them, or they texted STOP.</p>
+          </div>`)}
 
-        <div class="field">
-          <label for="contact-line">Contact line</label>
-          <input id="contact-line" maxlength="160" value="${esc(a.contactLine || '')}" placeholder="12 King St W, Hamilton ON, mikesplumbing.ca">
-          <p class="note">Canada's anti-spam law (CASL) asks business texts to include your mailing address and a phone number, email or website. This goes at the end of both texts, before "Reply STOP to opt out." Stick to plain keyboard characters: one emoji or special symbol makes every text cost about twice as much.</p>
-        </div>
+        ${section('04', 'Assistant and alerts', `
+          <label class="toggle" for="intake-on"><input type="checkbox" id="intake-on" ${a.intakeOn ? 'checked' : ''}>Ask callers for the job details first (name, address, how urgent, best time), then text me one summary</label>
+          <label class="toggle" for="notify-on"><input type="checkbox" id="notify-on" ${a.notifyOwner ? 'checked' : ''}>Text me at ${esc(data.business.ownerPhone)} when a customer replies</label>
+          <div class="summary-row">
+            <label class="toggle" for="summary-on"><input type="checkbox" id="summary-on" ${a.summaryOn ? 'checked' : ''}>Text me a morning summary at</label>
+            <input id="summary-time" aria-label="Summary time" value="${esc(a.summaryTime || '7:00 AM')}" ${a.summaryOn ? '' : 'disabled'}>
+          </div>`)}
 
-        <label class="toggle" for="intake-on"><input type="checkbox" id="intake-on" ${a.intakeOn ? 'checked' : ''}>When a caller texts back, ask them for the job details first (name, address, how urgent, best time), then text me one summary</label>
-
-        <label class="toggle" for="notify-on"><input type="checkbox" id="notify-on" ${a.notifyOwner ? 'checked' : ''}>Text me at ${esc(data.business.ownerPhone)} when a customer replies. Reply to that text to answer them.</label>
-
-        <div class="summary-row">
-          <label class="toggle" for="summary-on"><input type="checkbox" id="summary-on" ${a.summaryOn ? 'checked' : ''}>Text me a morning summary at</label>
-          <input id="summary-time" aria-label="Summary time" value="${esc(a.summaryTime || '7:00 AM')}" ${a.summaryOn ? '' : 'disabled'}>
-        </div>
-
-        <div class="block" style="gap: 10px">
-          <h2>Business hours</h2>
+        ${section('05', 'Business hours', `
           <p class="note">Outside these hours, callers get the "closed" text. Type times like 7:00 AM.</p>
           <div class="hours-edit">
             ${data.hours.map((h, i) => `
@@ -383,24 +532,20 @@ function autotextPage() {
                 <span>to</span>
                 <input id="to-${i}" aria-label="${h.day} closes" value="${esc(h.close || '6:00 PM')}" ${h.open ? '' : 'disabled'}>
               </div>`).join('')}
-          </div>
-        </div>
+          </div>`)}
 
-        <div class="block" style="gap: 10px">
-          <h2>Setup</h2>
+        ${section('06', 'Setup', `
           <ul class="checks">${data.setup.map(s => `<li class="${s.done ? 'done' : ''}">${esc(s.label)}</li>`).join('')}</ul>
-          <p class="note">Your Ringleader number: <b>${esc(data.business.ringleaderNumber || 'not set up yet')}</b></p>
-        </div>
+          <p class="note">Your Ringleader number: <b>${esc(data.business.ringleaderNumber || 'not set up yet')}</b></p>`)}
 
         <div class="save-row">
           <button class="btn btn-main" type="button" id="save">Save changes</button>
         </div>
       </div>
 
-      <aside class="phone-preview">
-        <p class="label">What the customer sees</p>
+      <aside class="phone-preview" aria-label="What the customer sees">
         <div class="phone">
-          <p class="from">${esc(data.business.name)}<br>${esc(data.business.ringleaderNumber)}</p>
+          <p class="from"><b>${esc(data.business.name)}</b>${esc(data.business.ringleaderNumber)}</p>
           <div class="bubble" id="preview-bubble"></div>
         </div>
         <div class="tabs" role="group" aria-label="Preview which text">
@@ -445,45 +590,46 @@ function readSettingsForm() {
   };
 }
 
-// ---------- Pages: Front Desk and Crew (not built yet) ----------
+// ---------- Page: Next up (Front Desk and Crew, not built yet) ----------
 
-function soonPage(plan) {
-  const plans = {
-    frontdesk: {
+function soonPage() {
+  const plans = [
+    {
       name: 'Front Desk', price: 349,
       intro: 'Everything in Text-Back, plus an AI that answers your calls out loud, day and night.',
       adds: [
         ['Calls answered', 'How many calls the AI picked up, and how long each one took.'],
-        ['Emergencies', 'Calls about gas, flooding or sparks, sent straight to your on-call phone.'],
-        ['Booked into your calendar', 'Jobs the AI scheduled without you touching the phone.'],
-        ['Call summaries', 'A short written summary of every call, so you never have to listen back.']
+        ['Emergencies', 'Gas, flooding or sparks go straight to your on-call phone.'],
+        ['Booked into your calendar', 'Jobs scheduled without you touching the phone.'],
+        ['Call summaries', 'A short summary of every call, so you never listen back.']
       ]
     },
-    crew: {
+    {
       name: 'Crew', price: 599,
       intro: 'Everything in Front Desk, for shops with more than one line or a dispatcher.',
       adds: [
-        ['Up to 3 phone lines', 'See results for each line on its own, or all together.'],
-        ['English and Spanish', 'Conversations in either language, with a summary in English.'],
-        ['Job software sync', 'Booked jobs go straight into the software your shop already uses.'],
+        ['Up to 3 phone lines', 'Results for each line, or all together.'],
+        ['English and Spanish', 'Either language, with a summary in English.'],
+        ['Job software sync', 'Booked jobs go straight into the software you already use.'],
         ['Monthly review', 'A call with us each month to tune what the AI says.']
       ]
     }
-  };
-  const p = plans[plan];
+  ];
   return `
-    <header class="page-head">
-      <p class="label">${p.name} · coming soon</p>
-      <h1>${p.name}</h1>
-      <p class="status-line">${p.intro}</p>
+    <header class="soon-hero">
+      <h1 class="page-title">Next <span class="hi">up.</span></h1>
+      <p class="hero-sub">You have Text-Back. These plans turn on here when they're ready.</p>
+      <div class="tape-band" aria-hidden="true"></div>
     </header>
-    <section class="soon">
-      <p class="price">$${p.price}<small> /month</small></p>
-      <div class="block" style="gap: 8px">
-        <h2>What this section will show</h2>
-        <ul>${p.adds.map(([t, d]) => `<li><b>${t}</b><span>${d}</span></li>`).join('')}</ul>
-      </div>
-      <p class="note">We're building Text-Back first. This section turns on when ${p.name} is ready.</p>
+    <section class="soon-grid">
+      ${plans.map((p, i) => `
+        <article class="plan ${i === 0 ? 'feature' : ''}">
+          <span class="soon-tag">Coming soon</span>
+          <h2>${p.name}</h2>
+          <p class="price">$${p.price}<small> /month</small></p>
+          <p class="note">${p.intro}</p>
+          <ul>${p.adds.map(([t, d]) => `<li><b>${t}</b><span>${d}</span></li>`).join('')}</ul>
+        </article>`).join('')}
     </section>
   `;
 }
@@ -494,24 +640,46 @@ const PAGES = {
   overview: overviewPage,
   conversations: conversationsPage,
   autotext: autotextPage,
-  frontdesk: () => soonPage('frontdesk'),
-  crew: () => soonPage('crew')
+  frontdesk: soonPage,
+  crew: soonPage
 };
 const currentPage = () => location.hash.slice(1) in PAGES ? location.hash.slice(1) : 'overview';
 
+// Animations play when a page opens, not on the quiet refresh every 15 seconds.
+let animateNext = true;
+
 function render() {
   const page = currentPage();
+  const animate = animateNext;
+  animateNext = false;
+  main.className = 'main' + (animate ? ' animate' : '');
   main.innerHTML = PAGES[page]();
-  document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+  document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page || (page === 'crew' && a.dataset.page === 'frontdesk')));
   document.getElementById('biz-name').textContent = data.business.name;
   document.getElementById('waiting-count').textContent = stats().waiting || '';
-  document.getElementById('side-foot').textContent =
-    mode === 'live' ? 'Live. Texts send from ' + data.business.ringleaderNumber + '.'
-      : mode === 'test' ? 'Test mode. No real texts are sent.'
-        : 'Example data. Start the server to see real calls.';
+  const chip = document.getElementById('side-foot');
+  chip.className = 'mode ' + mode;
+  chip.textContent = mode === 'live' ? 'Live' : mode === 'test' ? 'Test mode' : 'Example data';
+  chip.title = mode === 'live' ? 'Texts send from ' + data.business.ringleaderNumber : mode === 'test' ? 'No real texts are sent' : 'Start the server to see real calls';
   if (page === 'autotext') updateAutotext();
   const msgs = document.getElementById('msgs');
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  if (animate) countUp();
+}
+
+// The big dollar number counts up from zero.
+function countUp() {
+  const el = main.querySelector('[data-count]');
+  if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const target = Number(el.dataset.count);
+  if (!target) return;
+  const start = performance.now(), ms = 1400;
+  const step = now => {
+    const t = Math.min(1, (now - start) / ms);
+    el.textContent = money(target * (1 - Math.pow(1 - t, 4)));
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 async function refresh() {
@@ -519,7 +687,7 @@ async function refresh() {
   render();
 }
 
-window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { animateNext = true; render(); window.scrollTo(0, 0); });
 
 // Check for new texts every 15 seconds, unless you're in the middle of typing.
 setInterval(() => {
@@ -530,7 +698,24 @@ setInterval(() => {
   refresh().then(() => window.scrollTo(0, y));
 }, 15000);
 
+// ---------- Chart hover labels ----------
+
+const tip = document.getElementById('tip');
+document.addEventListener('pointermove', e => {
+  const target = e.target.closest?.('[data-tip]');
+  if (!target) { tip.hidden = true; return; }
+  tip.textContent = target.dataset.tip;
+  tip.style.left = e.clientX + 'px';
+  tip.style.top = e.clientY + 'px';
+  tip.hidden = false;
+});
+document.addEventListener('pointerleave', () => { tip.hidden = true; });
+
 // ---------- Clicks and typing ----------
+
+main.addEventListener('toggle', e => {
+  if (e.target.classList.contains('sim')) testInputs.open = e.target.open;
+}, true);
 
 main.addEventListener('click', async e => {
   const open = e.target.closest('[data-open]');
@@ -599,7 +784,7 @@ main.addEventListener('submit', async e => {
       await refresh();
     } else if (form.dataset.test === 'text') {
       const r = await api('/api/test/customer-text', { phone: document.getElementById('test-phone').value, text: document.getElementById('test-text').value });
-      toast(r.optedOut ? 'They texted STOP. No more texts will go to this number.' : 'Customer reply received.');
+      toast(r.optedOut ? 'They texted STOP. No more texts will go to this number.' : r.assistant === 'ready' ? 'Ready to book. The owner got the summary.' : r.assistant ? 'The assistant asked the next question.' : 'Customer reply received.');
       await refresh();
     } else if (form.dataset.test === 'owner') {
       const r = await api('/api/test/owner-text', { text: document.getElementById('test-owner').value });
@@ -607,7 +792,7 @@ main.addEventListener('submit', async e => {
       await refresh();
     } else if (form.dataset.test === 'followup') {
       const r = await api('/api/test/follow-ups', {});
-      toast(r.reason === 'off' ? 'Follow-ups are turned off on the Auto-text page.' : r.sent ? `Sent ${r.sent} follow-up${r.sent === 1 ? '' : 's'}.` : 'Nobody needs a follow-up. Simulate a missed call first, and don\'t reply to it.');
+      toast(r.reason === 'off' ? 'Follow-ups are turned off in Settings.' : r.sent ? `Sent ${r.sent} follow-up${r.sent === 1 ? '' : 's'}.` : 'Nobody needs a follow-up. Simulate a missed call first, and don\'t reply to it.');
       await refresh();
     } else if (form.dataset.test === 'summary') {
       const r = await api('/api/test/morning-summary', {});

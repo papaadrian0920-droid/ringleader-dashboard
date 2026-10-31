@@ -472,7 +472,6 @@ function testPanel() {
 // ---------- Page: Texts ----------
 
 let filter = 'all';
-let search = ''; // what's typed in the search box above the list
 let openId = null;
 let editingName = false;
 
@@ -486,31 +485,10 @@ const checklist = () => data.checklist || [];
 const detailsIn = c => c.details ? checklist().filter(i => c.details.items[i.key]).length : 0;
 const firstName = c => c.name ? c.name.split(' ')[0] : 'them';
 const telLink = c => 'tel:+1' + String(c.phone).replace(/\D/g, '').slice(-10);
-const initials = c => c.name ? c.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() : '#';
-const groupOf = days => days === 0 ? 'Today' : days === 1 ? 'Yesterday' : days <= 6 ? 'This week' : days <= 13 ? 'Last week' : 'Earlier';
-// Search looks through names, numbers, the AI's job summary and every text.
-const matches = c => !search || [c.name, c.phone, c.summary, ...c.messages.map(m => m.text)].some(t => t && String(t).toLowerCase().includes(search.toLowerCase()));
-const shownList = () => data.conversations.filter((FILTERS.find(f => f[0] === filter) || FILTERS[0])[2]).filter(matches);
-// The list, with a heading each time the day group changes.
-function listHtml(list) {
-  let html = '', last = '';
-  for (const x of list) {
-    const group = groupOf(x.daysAgo);
-    if (group !== last) { html += `<p class="group">${group}</p>`; last = group; }
-    html += listItem(x);
-  }
-  return html || `<p class="empty" style="padding: 14px">${search ? 'No texts match that.' : 'Nothing here right now.'}</p>`;
-}
-// One-tap starts for a reply. They fill the box; nothing sends until you press Send.
-const quickReplies = c => [
-  `${c.name ? `Hi ${firstName(c)}, ` : 'Hi, '}it's ${data.business.owner}. I can come by today at `,
-  "What's the address?",
-  'Can you send a photo of it?',
-  "You're booked. See you then."
-];
 
 function conversationsPage() {
-  const list = shownList();
+  const test = (FILTERS.find(f => f[0] === filter) || FILTERS[0])[2];
+  const list = data.conversations.filter(test);
   if (!list.some(c => c.id === openId)) { openId = list[0] ? list[0].id : null; editingName = false; }
   const c = data.conversations.find(x => x.id === openId);
 
@@ -523,9 +501,8 @@ function conversationsPage() {
     </header>
 
     <section class="inbox">
-      <div class="inbox-side">
-        <label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span hidden>Search</span><input id="search" type="search" placeholder="Search names, numbers, texts" value="${esc(search)}" autocomplete="off"></label>
-        <div class="inbox-list">${listHtml(list)}</div>
+      <div class="inbox-list">
+        ${list.length ? list.map(listItem).join('') : `<p class="empty" style="padding: 14px">Nothing here right now.</p>`}
       </div>
       ${c ? threadHtml(c) + jobPanel(c) : `<div class="thread"><p class="empty" style="padding: 24px">Pick a conversation.</p></div>`}
     </section>
@@ -538,7 +515,6 @@ function listItem(x) {
   const progress = x.status === 'gathering' ? ` ${detailsIn(x)}/${checklist().length}` : '';
   return `
     <button type="button" data-open="${x.id}" class="${x.id === openId ? 'active' : ''} ${x.status}">
-      <span class="av ${x.status}" aria-hidden="true">${esc(initials(x))}</span>
       <span class="top"><b>${esc(who(x))}</b><time>${dayName(x.daysAgo)}</time></span>
       <span class="preview">${esc(line)}</span>
       <span><span class="pill ${x.status}">${STATUS[x.status]}${progress}${x.status === 'booked' ? ' ' + money(x.value) : ''}</span>${x.details?.timingAsked && x.status !== 'booked' ? '<span class="pill timing">Asked timing</span>' : ''}</span>
@@ -555,26 +531,16 @@ function threadHtml(c) {
   return `
     <div class="thread">
       <div class="thread-head">
-        <span class="av big ${c.status}" aria-hidden="true">${esc(initials(c))}</span>
         <div class="thread-who">
           ${c.name && !editingName
             ? `<span class="name-row"><b>${esc(c.name)}</b><button type="button" class="edit" data-edit-name aria-label="Edit name">Edit</button></span>`
             : nameForm}
           <span class="thread-phone">#${esc(c.id)} · ${esc(c.phone)} · ${dayName(c.daysAgo)} ${esc(c.time)}</span>
         </div>
-        <span class="pill ${c.status}">${STATUS[c.status]}</span>
       </div>
       <div class="msgs" id="msgs">
-        <p class="sys missed"><i aria-hidden="true"></i>Missed call · ${dayName(c.daysAgo)} ${esc(c.time)}</p>
         ${c.messages.map(m => `<div class="msg ${m.from}${m.status === 'failed' || m.status === 'undelivered' ? ' failed' : ''}"><p>${esc(m.text)}</p><small>${esc(messageLabel(m, c))}</small></div>`).join('')}
-        ${{
-          booked: `<p class="sys booked">Booked · ${money(c.value)}</p>`,
-          'opted-out': '<p class="sys stop">Texted STOP. No more texts go to this number.</p>',
-          gathering: `<div class="typing"><span></span><span></span><span></span><small>Waiting for ${esc(firstName(c))} to answer the AI</small></div>`,
-          'no-reply': '<p class="sys quiet">No reply yet</p>'
-        }[c.status] || ''}
       </div>
-      ${c.status === 'opted-out' ? '' : `<div class="quick" aria-label="Quick replies">${quickReplies(c).map(q => `<button type="button" data-quick="${esc(q)}">${esc(q.trim())}</button>`).join('')}</div>`}
       <form class="composer" data-reply="${c.id}">
         <label for="reply-box" hidden>Reply</label>
         <input id="reply-box" placeholder="Text ${esc(who(c))}…" maxlength="640" autocomplete="off">
@@ -623,7 +589,7 @@ function jobPanel(c) {
 
       ${d ? `
         <div class="checklist">
-          <h3>Job details <span class="ring-mini"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" pathLength="100" stroke-dasharray="${Math.round(got / total * 100)} 100"/></svg>${got}/${total}</span></h3>
+          <h3>Job details <span>${got}/${total}</span></h3>
           ${d.done && unsure.length ? `<p class="unsure-note">Not sure about ${unsure.map(i => i.label.toLowerCase()).join(', ')}. Ask when you call.</p>` : ''}
           <ul>
             ${checklist().map(i => {
@@ -910,14 +876,6 @@ main.addEventListener('click', async e => {
     return;
   }
   if (e.target.closest('[data-focus-reply]')) { document.getElementById('reply-box')?.focus(); return; }
-  const quick = e.target.closest('[data-quick]');
-  if (quick) {
-    const box = document.getElementById('reply-box');
-    box.value = quick.dataset.quick;
-    box.focus();
-    box.setSelectionRange(box.value.length, box.value.length);
-    return;
-  }
   const unbook = e.target.closest('[data-unbook]');
   if (unbook) { await undoBooked(Number(unbook.dataset.unbook)); return; }
   const f = e.target.closest('[data-filter]');
@@ -1066,11 +1024,3 @@ async function saveName(form) {
 }
 
 refresh();
-
-// Typing in the search box redraws just the list, so the box keeps your cursor.
-main.addEventListener('input', e => {
-  if (e.target.id !== 'search') return;
-  search = e.target.value;
-  const list = main.querySelector('.inbox-list');
-  if (list) list.innerHTML = listHtml(shownList());
-});

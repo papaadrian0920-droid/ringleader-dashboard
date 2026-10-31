@@ -161,3 +161,75 @@ window.RL_DATA = {
       messages: [{ from: 'auto', text: '' }] }
   ]
 };
+
+// A second example: the same shop after two busy months of using Ringleader (about 60 days of missed calls).
+// Open the dashboard with ?busy on the end of the address to see it. Everything here is made up too,
+// and it comes out the same every time (the "random" numbers start from a fixed seed).
+window.RL_BUSY = (function () {
+  let seed = 20261031;
+  const rand = () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
+  const pick = list => list[Math.floor(rand() * list.length)];
+  const between = (a, b) => Math.round((a + rand() * (b - a)) / 10) * 10;
+  const FIRST = ['Maria', 'Derek', 'Linda', 'Tom', 'Aisha', 'Greg', 'Rosa', 'Kevin', 'Priya', 'Sam', 'Nadia', 'Chris', 'Fatima', 'Jordan', 'Wei', 'Olivia', 'Marcus', 'Elena', 'Raj', 'Hannah', 'Luis', 'Grace', 'Omar', 'Sofia', 'Ben', 'Tanya', 'Andre', 'Mei', 'Victor', 'Leah'];
+  const LAST = ['Gomez', 'Hall', 'Park', 'Reyes', 'Khan', 'Wilson', 'Jimenez', 'Brown', 'Patel', 'Ortiz', 'Haddad', 'Nguyen', 'Ali', 'Martin', 'Chen', 'Singh', 'Rossi', 'Kowalski', 'Osei', 'Fraser', 'Silva', 'Dubois', 'Lee', 'Murphy'];
+  const STREETS = ['Locke St S', 'King St W', 'Barton St E', 'Main St E', 'Ottawa St N', 'Kenilworth Ave', 'Upper James St', 'Concession St', 'Aberdeen Ave', 'Garth St'];
+  // [what the customer texts, lowest price, highest price, where]
+  const JOBS = [
+    ['Our water heater is leaking all over the floor', 1200, 2400, 'Basement'],
+    ['Toilet keeps running all night', 180, 450, 'Bathroom'],
+    ['Kitchen sink is backing up into the dishwasher', 180, 380, 'Kitchen'],
+    ['No hot water since this morning', 250, 1800, 'Basement'],
+    ['A pipe burst in the basement, water everywhere', 450, 1500, 'Basement'],
+    ['Furnace is making a loud banging noise', 220, 900, 'Basement'],
+    ['Sump pump stopped turning on', 450, 1100, 'Basement'],
+    ['Shower faucet keeps dripping', 150, 320, 'Bathroom'],
+    ['Floor drain is backing up after the rain', 300, 900, 'Basement'],
+    ['Need a new dishwasher hooked up', 180, 300, 'Kitchen'],
+    ['Low water pressure in the whole house', 200, 700, 'Whole house'],
+    ['Every drain in the house is slow', 350, 950, 'Whole house']
+  ];
+  const SLOTS = ['at 2 today', 'tomorrow at 9', 'this afternoon around 3', 'first thing tomorrow', 'Thursday morning', 'Friday between 8 and 10', 'Monday at 11'];
+  const YES = ['Yes please!', 'Perfect, see you then', 'ok thanks', 'That works', 'Great, thank you!'];
+  const clock = mins => { const h = Math.floor(mins / 60), m = mins % 60; return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+
+  const conversations = [];
+  let id = 1;
+  for (let ago = 0; ago < 60; ago++) {
+    const weekday = new Date(Date.now() - ago * 864e5).getDay(); // 0 = Sunday
+    const calls = weekday === 0 ? 1 + Math.floor(rand() * 3) : weekday === 6 ? 2 + Math.floor(rand() * 3) : 3 + Math.floor(rand() * 5);
+    const times = Array.from({ length: calls }, () => 420 + Math.floor(rand() * 870)).sort((a, b) => b - a); // 7:00 AM to 9:30 PM, newest first
+    for (const mins of times) {
+      const name = pick(FIRST) + ' ' + pick(LAST);
+      const first = name.split(' ')[0];
+      const phone = `(555) 014-${String(1000 + Math.floor(rand() * 9000))}`;
+      const [problem, lo, hi, where] = pick(JOBS);
+      const roll = rand();
+      let status = roll < 0.37 ? 'no-reply' : roll < 0.65 ? 'booked' : roll < 0.97 ? 'replied' : 'opted-out';
+      // the last day or two still has people mid-conversation
+      if (ago <= 1 && status === 'replied') status = pick(['ready', 'waiting', 'gathering']);
+      const c = { id: id++, name: status === 'no-reply' ? null : name, phone, daysAgo: ago, time: clock(mins), status, value: 0, messages: [{ from: 'auto', text: '' }] };
+      if (status === 'opted-out') { c.name = null; c.messages.push({ from: 'customer', text: 'STOP' }); }
+      else if (status !== 'no-reply') {
+        c.messages.push({ from: 'customer', text: problem });
+        if (status === 'booked') {
+          c.value = between(lo, hi);
+          c.messages.push({ from: 'owner', text: `Hi ${first}, it's Marco. I can be there ${pick(SLOTS)}. Does that work?` }, { from: 'customer', text: pick(YES) }, { from: 'owner', text: "You're booked. See you then." });
+        } else if (status === 'replied') {
+          c.messages.push({ from: 'owner', text: `Hi ${first}, it's Marco. I could come by ${pick(SLOTS)}. Want me to put you down?` });
+        } else {
+          const address = `${10 + Math.floor(rand() * 290)} ${pick(STREETS)}, Hamilton`;
+          const done = status !== 'gathering';
+          c.summary = `${name}, ${address.split(',')[0]}: ${problem.toLowerCase()}`;
+          c.details = {
+            items: { name, problem, where, started: done ? 'Yesterday' : '', urgent: done ? 'Needs it fixed soon' : '', address: done ? address : '', property: done ? 'House, owns it' : '', free: status === 'ready' ? 'Weekday mornings' : '' },
+            timingAsked: status === 'waiting', done
+          };
+          c.messages.push({ from: 'assistant', text: `Sorry to hear that! Marco will text you shortly. Can I get your name, and when did it start?` });
+          if (done) c.messages.push({ from: 'customer', text: `${name}. Started yesterday. ${address.split(',')[0]}` }, { from: 'assistant', text: "Perfect, that's everything. Marco will text you shortly." });
+        }
+      }
+      conversations.push(c);
+    }
+  }
+  return Object.assign({}, window.RL_DATA, { conversations });
+})();

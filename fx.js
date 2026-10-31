@@ -18,23 +18,35 @@
   // Same conversation, same spot, every time (so dots don't jump around on the 15-second refresh)
   const hash = n => { let x = Math.sin(n * 9301 + 49297) * 233280; return x - Math.floor(x); };
 
+  // One slice per day of the week. Over 30 or 60 days, every Monday's calls land in the Monday slice,
+  // so you can see which days you miss the most.
+  const WEEKDAYS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+  const sliceOf = ago => (new Date(Date.now() - ago * 864e5).getDay() + 6) % 7;
+  let todaySlice = 0, crowd = 1, shown = [];
   function readData() {
-    const week = weekDays();
-    days = week.map(d => d.label);
-    const maxValue = Math.max(1, ...data.conversations.filter(c => c.status === 'booked' && c.daysAgo <= 6).map(c => c.value));
-    items = [];
-    week.forEach((d, i) => d.list.forEach(c => {
+    days = WEEKDAYS;
+    todaySlice = sliceOf(0);
+    const list = inRange();
+    const booked = list.filter(c => c.status === 'booked').sort((a, b) => b.value - a.value);
+    const maxValue = Math.max(1, ...booked.map(c => c.value));
+    // only the biggest jobs get a price label and a glow, or a busy radar turns to soup
+    const labelled = new Set(booked.slice(0, 5).map(c => c.id)), glowing = new Set(booked.slice(0, 12).map(c => c.id));
+    crowd = list.length > 60 ? 0.65 : list.length > 25 ? 0.82 : 1;
+    items = list.map(c => {
       const kind = c.status === 'booked' ? 'booked' : customerReplied(c) ? 'replied' : 'none';
       const ring = kind === 'booked' ? 0.36 : kind === 'replied' ? 0.66 : 0.92;
-      items.push({
-        c, kind, day: i,
-        ang: (i + 0.2 + hash(c.id) * 0.6) / 7 * Math.PI * 2,
-        r: ring + (hash(c.id + 7) - 0.5) * 0.12,
-        h: kind === 'booked' ? 0.2 + 0.5 * (c.value / maxValue) : kind === 'replied' ? 0.12 : 0,
-        delay: Math.random() * 0.5
-      });
-    }));
+      const day = sliceOf(c.daysAgo);
+      return {
+        c, kind, day,
+        ang: (day + 0.12 + hash(c.id) * 0.76) / 7 * Math.PI * 2,
+        r: ring + (hash(c.id + 7) - 0.5) * (list.length > 25 ? 0.2 : 0.12),
+        h: kind === 'booked' ? 0.16 + 0.54 * (c.value / maxValue) : kind === 'replied' ? 0.11 : 0,
+        delay: hash(c.id + 3) * 0.6,
+        label: labelled.has(c.id), glow: glowing.has(c.id)
+      };
+    });
   }
+  const when = c => c.daysAgo === 0 ? 'today' : c.daysAgo === 1 ? 'yesterday' : c.daysAgo + ' days ago';
 
   function size() {
     const r = canvas.getBoundingClientRect();
@@ -58,7 +70,7 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
     // a low camera angle, so the floor reads as a floor and the pillars stand up off it
-    const R = Math.min(W * 0.46, H * 0.66);
+    const R = Math.min(W * (W < 500 ? 0.39 : 0.46), H * 0.66); // narrower on phones so the day labels fit
     const cx = W / 2, cy = H * 0.6;
     const elev = 0.52 + tiltY * 0.3;
     const P = (x, y, z) => project(x, y, z, R, cx, cy, elev);
@@ -84,7 +96,7 @@
       const la = (i + 0.5) / 7 * Math.PI * 2, lp = P(Math.cos(la) * 1.17, 0, Math.sin(la) * 1.17);
       ctx.font = `600 ${Math.round(11 * lp.k)}px "IBM Plex Mono", monospace`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = i === 6 ? '#C8FF2E' : 'rgba(201,201,194,' + (0.45 + 0.4 * Math.max(0, lp.d)) + ')';
+      ctx.fillStyle = i === todaySlice ? '#C8FF2E' : 'rgba(201,201,194,' + (0.45 + 0.4 * Math.max(0, lp.d)) + ')';
       ctx.fillText((days[i] || '').toUpperCase(), lp.x, lp.y);
     }
     // the sweep: a wedge of light going round
@@ -108,6 +120,7 @@
       const e = 1 - Math.pow(1 - gi, 3);
       return { it, base: P(x, 0, z), top: P(x, it.h * e, z), e };
     }).sort((a, b) => a.base.d - b.base.d);
+    shown = pts;
     hover = null;
     for (const p of pts) {
       const { it, base, top, e } = p;
@@ -122,14 +135,14 @@
         if (it.kind === 'booked') { lg.addColorStop(0, 'rgba(200,255,46,.15)'); lg.addColorStop(1, 'rgba(200,255,46,.95)'); }
         else { lg.addColorStop(0, 'rgba(244,244,241,.1)'); lg.addColorStop(1, 'rgba(244,244,241,.75)'); }
         ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.lineTo(top.x, top.y);
-        ctx.strokeStyle = lg; ctx.lineWidth = (it.kind === 'booked' ? 6 : 3) * base.k; ctx.lineCap = 'round'; ctx.stroke();
+        ctx.strokeStyle = lg; ctx.lineWidth = (it.kind === 'booked' ? 6 : 3) * crowd * base.k; ctx.lineCap = 'round'; ctx.stroke();
       }
-      const r = (it.kind === 'booked' ? 6.5 : it.kind === 'replied' ? 4.5 : 3.5) * top.k * (near ? 1.5 : 1) * e;
-      if (it.kind === 'booked') { ctx.shadowColor = 'rgba(200,255,46,.9)'; ctx.shadowBlur = 18; }
+      const r = (it.kind === 'booked' ? 6.5 : it.kind === 'replied' ? 4.5 : 3.5) * crowd * top.k * (near ? 1.6 : 1) * e;
+      if (it.kind === 'booked' && (it.glow || near)) { ctx.shadowColor = 'rgba(200,255,46,.9)'; ctx.shadowBlur = 18; }
       ctx.beginPath(); ctx.arc(top.x, top.y, r, 0, Math.PI * 2);
       ctx.fillStyle = it.kind === 'booked' ? '#C8FF2E' : it.kind === 'replied' ? '#F4F4F1' : '#55555C';
       ctx.fill(); ctx.shadowBlur = 0;
-      if (it.kind === 'booked' && top.d > -0.2) {
+      if (it.kind === 'booked' && (it.label || near) && top.d > -0.2) {
         ctx.font = `800 ${Math.round(12 * top.k)}px Archivo, sans-serif`;
         ctx.fillStyle = 'rgba(244,244,241,.92)'; ctx.textAlign = 'center';
         ctx.fillText(money(it.c.value), top.x, top.y - 14 * top.k);
@@ -145,7 +158,7 @@
     // hover label, reusing the dashboard's own tooltip
     if (hover) {
       const c = hover.it.c, r = canvas.getBoundingClientRect();
-      tip.textContent = `${who(c)} · ${hover.it.kind === 'booked' ? 'Booked ' + money(c.value) : hover.it.kind === 'replied' ? 'Texted back' : 'No reply yet'} · ${days[hover.it.day]}`;
+      tip.textContent = `${who(c)} · ${hover.it.kind === 'booked' ? 'Booked ' + money(c.value) : hover.it.kind === 'replied' ? 'Texted back' : 'No reply yet'} · ${when(c)} · click to open`;
       tip.style.left = r.left + hover.top.x + 'px'; tip.style.top = r.top + hover.top.y + 'px'; tip.hidden = false;
       canvas.style.cursor = 'pointer';
     } else if (mouse) { tip.hidden = true; canvas.style.cursor = dragging ? 'grabbing' : 'grab'; }
@@ -158,9 +171,19 @@
     if (dragging) { rot = dragging.rot + (e.clientX - dragging.x) * 0.008; tiltY = Math.max(-1, Math.min(1, dragging.ty + (e.clientY - dragging.y) * 0.006)); }
   });
   canvas.addEventListener('pointerleave', () => { mouse = null; tip.hidden = true; });
-  canvas.addEventListener('pointerdown', e => { dragging = { x: e.clientX, y: e.clientY, rot, ty: tiltY }; canvas.setPointerCapture(e.pointerId); });
+  let downAt = null;
+  canvas.addEventListener('pointerdown', e => { downAt = { x: e.clientX, y: e.clientY }; dragging = { x: e.clientX, y: e.clientY, rot, ty: tiltY }; canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointerup', () => { dragging = null; });
-  canvas.addEventListener('click', () => { if (hover) location.hash = 'conversations'; });
+  // Click (or tap) a call to open that person's texts. Works on phones too, where there's no hover.
+  canvas.addEventListener('click', e => {
+    if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 6) return; // that was a drag, not a tap
+    const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    let pick = null, nearest = 20;
+    for (const p of shown) { const d = Math.hypot(mx - p.top.x, my - p.top.y); if (d < nearest) { nearest = d; pick = p; } }
+    if (!pick) return;
+    filter = 'all'; openId = pick.it.c.id; editingName = false; tip.hidden = true;
+    location.hash = 'conversations';
+  });
 
   function loop(now) {
     if (!running) return;

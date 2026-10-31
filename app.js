@@ -49,7 +49,10 @@ const who = c => c.name || c.phone;
 const lastText = c => c.messages.length ? c.messages[c.messages.length - 1].text : '';
 const lastCustomerText = c => [...c.messages].reverse().find(m => m.from === 'customer')?.text || lastText(c);
 const customerReplied = c => c.messages.some(m => m.from === 'customer');
-const thisWeek = () => data.conversations.filter(c => c.daysAgo <= 6);
+// How many days Today looks back over: 7, 30 or 60 (the buttons at the top of Today).
+let range = 7;
+const busyDemo = /[?&]busy\b/.test(location.search);
+const inRange = () => data.conversations.filter(c => c.daysAgo < range);
 
 function greeting() {
   const h = new Date().getHours();
@@ -80,6 +83,8 @@ async function load() {
     mode = data.mode;
   } catch {
     mode = 'example';
+    // ?busy on the end of the address shows the two-busy-months example instead of the quiet week
+    if (busyDemo) data = window.RL_BUSY;
     // In the example data the auto-text is left blank, so fill it in from the template.
     data.conversations.forEach(c => {
       const first = c.messages[0];
@@ -98,7 +103,7 @@ async function api(path, body, method = 'POST') {
 // ---------- Numbers (all worked out from the conversations, so they always add up) ----------
 
 function stats() {
-  const week = thisWeek();
+  const week = inRange();
   const booked = week.filter(c => c.status === 'booked');
   return {
     missed: week.length,
@@ -112,13 +117,17 @@ function stats() {
 
 const pct = (part, whole) => whole ? Math.round((part / whole) * 100) : 0;
 
-// The last 7 days, oldest first, each with its conversations.
-function weekDays() {
-  return [6, 5, 4, 3, 2, 1, 0].map(ago => ({
-    ago,
-    label: ago === 0 ? 'Today' : new Date(Date.now() - ago * 864e5).toLocaleDateString('en-US', { weekday: 'short' }),
-    list: data.conversations.filter(c => c.daysAgo === ago)
-  }));
+// Every day in the range, oldest first, each with its conversations.
+// 7 days are labelled Mon, Tue...; longer ranges get dates like Oct 3.
+function rangeDays() {
+  return Array.from({ length: range }, (_, i) => range - 1 - i).map(ago => {
+    const date = new Date(Date.now() - ago * 864e5);
+    return {
+      ago,
+      label: ago === 0 ? 'Today' : date.toLocaleDateString('en-US', range === 7 ? { weekday: 'short' } : { month: 'short', day: 'numeric' }),
+      list: data.conversations.filter(c => c.daysAgo === ago)
+    };
+  });
 }
 
 // A smooth line through points (so the chart curves instead of zig-zagging).
@@ -145,12 +154,17 @@ function overviewPage() {
     ? `Text-Back is on. Calls you miss on ${esc(data.business.ownerPhone)} get a text in about 5 seconds.`
     : mode === 'test'
       ? 'Test mode. Nothing is really sent. Open the simulator to try it.'
-      : 'Example data. Start the server to see your real calls.';
+      : busyDemo
+        ? `Example: two busy months. <a class="link" href="${location.pathname}#overview">Back to the quiet week</a>`
+        : `Example data. Start the server to see your real calls. <a class="link" href="?busy#overview">See it after two busy months &rarr;</a>`;
 
   return `
     <section class="hero" aria-label="This week">
       <div class="hero-copy">
-        <p class="kicker"><span class="pulse"></span>Last 7 days</p>
+        <div class="range-row">
+          <p class="kicker"><span class="pulse"></span>Last ${range} days</p>
+          <div class="range" role="group" aria-label="How far back to look">${[7, 30, 60].map(n => `<button type="button" data-range="${n}" aria-pressed="${n === range}">${n}d</button>`).join('')}</div>
+        </div>
         <h1>${esc(greeting())}</h1>
         <p class="hero-money" data-count="${s.money}">${money(s.money)}</p>
         <p class="hero-sub">${s.money ? `in jobs booked from <span class="hi">calls you missed</span>.` : 'in booked jobs so far. They stack up here as calls turn into work.'}</p>
@@ -187,13 +201,13 @@ function overviewPage() {
     </section>
 
     <section class="card money-card">
-      <div class="card-head"><h2>Booked, adding up</h2><span class="note">${money(s.money)} this week</span></div>
+      <div class="card-head"><h2>Booked, adding up</h2><span class="note">${money(s.money)} in ${range} days</span></div>
       <div class="hero-chart">${heroChart()}</div>
     </section>
 
     <section class="card week">
       <div class="card-head">
-        <h2>Missed calls by day</h2>
+        <h2>Missed calls by ${range > 30 ? 'week' : 'day'}</h2>
         <div class="legend">
           <span><i style="background: var(--hivis)"></i>Booked</span>
           <span><i style="background: var(--mid)"></i>Texted back</span>
@@ -247,38 +261,69 @@ function feedRow(c) {
     </a>`;
 }
 
-// Hero chart: booked dollars adding up over the week.
+// "Booked, adding up": the running total of booked jobs over the range, with each day's bookings as faint bars behind it.
 function heroChart() {
-  const days = weekDays();
+  const days = rangeDays(), n = days.length;
+  const daily = days.map(d => d.list.filter(c => c.status === 'booked'));
+  const dailySum = daily.map(list => list.reduce((sum, c) => sum + c.value, 0));
   let total = 0;
-  const daily = days.map(d => d.list.filter(c => c.status === 'booked').reduce((sum, c) => sum + c.value, 0));
-  const running = daily.map(v => (total += v));
-  const W = 560, H = 250, P = 14, B = 34;
-  const max = Math.max(...running, 1);
-  const x = i => P + i * (W - 2 * P) / 6;
-  const y = v => P + (H - P - B) * (1 - v / max);
+  const running = dailySum.map(v => (total += v));
+  const W = 960, H = 300, L = 62, R = 26, T = 40, B = 36;
+  const max = niceMax(Math.max(...running, 100));
+  const maxDay = Math.max(...dailySum, 1);
+  const step = (W - L - R) / (n - 1);
+  const x = i => L + i * step;
+  const y = v => T + (H - T - B) * (1 - v / max);
   const pts = running.map((v, i) => [x(i), y(v)]);
   const line = smoothPath(pts);
-  const area = `${line} L${x(6)},${y(0)} L${x(0)},${y(0)} Z`;
-  const last = pts[6];
-  const hits = days.map((d, i) => `<rect x="${x(i) - (W - 2 * P) / 12}" y="0" width="${(W - 2 * P) / 6}" height="${H}" fill="transparent" data-tip="${esc(d.label)}: ${money(daily[i])} booked, ${money(running[i])} so far"/>`).join('');
+  const area = `${line} L${x(n - 1)},${y(0)} L${x(0)},${y(0)} Z`;
+  const best = dailySum.indexOf(Math.max(...dailySum));
+  const every = Math.ceil(n / 8);
+  let svg = '';
+  for (let k = 0; k <= 4; k++) {
+    const v = max * k / 4;
+    svg += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"${k ? ' stroke-dasharray="3 6"' : ''}/><text x="${L - 12}" y="${y(v) + 4}" text-anchor="end" class="axis">${shortMoney(v)}</text>`;
+  }
+  // each day's bookings as a faint bar, scaled to the busiest day
+  const bw = Math.max(3, Math.min(28, step * 0.55));
+  days.forEach((d, i) => {
+    if (!dailySum[i]) return;
+    const h = (H - T - B) * 0.42 * dailySum[i] / maxDay;
+    svg += `<rect class="day-bar fade-in" x="${x(i) - bw / 2}" y="${y(0) - h}" width="${bw}" height="${h}" rx="${Math.min(4, bw / 2)}"/>`;
+  });
+  svg += `<path class="fade-in" d="${area}" fill="url(#heroFill)"/>`;
+  svg += `<path d="${line}" fill="none" stroke="#C8FF2E" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".22" filter="url(#heroGlow)"/>`;
+  svg += `<path class="draw" d="${line}" fill="none" stroke="url(#heroLine)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  if (n <= 30) pts.forEach(([px, py], i) => { if (dailySum[i]) svg += `<circle class="fade-in" cx="${px}" cy="${py}" r="${n > 7 ? 3.5 : 5}" fill="var(--bg)" stroke="#C8FF2E" stroke-width="2"/>`; });
+  // a flag on the best day
+  if (dailySum[best]) {
+    const [bx, by] = pts[best];
+    const anchor = best > n * 0.8 ? 'end' : best < n * 0.2 ? 'start' : 'middle';
+    svg += `<g class="fade-in"><line x1="${bx}" x2="${bx}" y1="${by - 9}" y2="${T - 16}" stroke="var(--mid)" stroke-dasharray="2 4"/><text x="${bx}" y="${T - 22}" text-anchor="${anchor}" class="flag-text">Best day: ${money(dailySum[best])}</text></g>`;
+  }
+  // the total so far, pulsing at the end of the line
+  const [lx, ly] = pts[n - 1];
+  svg += `<circle cx="${lx}" cy="${ly}" r="16" fill="#C8FF2E" opacity=".16"><animate attributeName="r" values="10;22;10" dur="2.4s" repeatCount="indefinite"/></circle><circle class="fade-in" cx="${lx}" cy="${ly}" r="7" fill="#C8FF2E"/>`;
+  days.forEach((d, i) => { if ((i % every === 0 && n - 1 - i >= every / 2) || i === n - 1) svg += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" class="axis${d.ago === 0 ? ' today' : ''}">${esc(d.label)}</text>`; });
+  days.forEach((d, i) => {
+    const jobs = daily[i].length;
+    svg += `<rect x="${x(i) - step / 2}" y="0" width="${step}" height="${H}" fill="transparent" data-tip="${esc(d.label)}: ${money(dailySum[i])} booked (${jobs} job${jobs === 1 ? '' : 's'}), ${money(running[i])} so far"/>`;
+  });
   return `
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Booked dollars adding up over the last 7 days, ${money(total)} in total">
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Booked dollars adding up over the last ${n} days, ${money(total)} in total">
       <defs>
-        <linearGradient id="heroFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#C8FF2E" stop-opacity=".45"/>
-          <stop offset="1" stop-color="#C8FF2E" stop-opacity="0"/>
-        </linearGradient>
+        <linearGradient id="heroFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C8FF2E" stop-opacity=".38"/><stop offset="1" stop-color="#C8FF2E" stop-opacity="0"/></linearGradient>
+        <linearGradient id="heroLine" x1="0" x2="1"><stop offset="0" stop-color="#86AE1E"/><stop offset="1" stop-color="#EAFF9E"/></linearGradient>
+        <filter id="heroGlow" x="-10%" y="-60%" width="120%" height="220%"><feGaussianBlur stdDeviation="6"/></filter>
       </defs>
-      <line x1="${P}" x2="${W - P}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)" stroke-width="1"/>
-      <path class="fade-in" d="${area}" fill="url(#heroFill)"/>
-      <path class="draw" d="${line}" fill="none" stroke="#C8FF2E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-      ${pts.map(([px, py], i) => daily[i] ? `<circle class="fade-in" cx="${px}" cy="${py}" r="4.5" fill="var(--bg)" stroke="#C8FF2E" stroke-width="2"/>` : '').join('')}
-      <circle class="fade-in" cx="${last[0]}" cy="${last[1]}" r="16" fill="#C8FF2E" opacity=".18"/>
-      <circle class="fade-in" cx="${last[0]}" cy="${last[1]}" r="7" fill="#C8FF2E"/>
-      ${days.map((d, i) => `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="13" font-weight="600" fill="var(--soft)" font-family="IBM Plex Mono, monospace">${esc(d.label)}</text>`).join('')}
-      ${hits}
+      ${svg}
     </svg>`;
+}
+const shortMoney = v => v >= 1000 ? '$' + +(v / 1000).toFixed(1) + 'k' : '$' + Math.round(v);
+// Rounds the top of a chart up to a tidy number (1, 2, 2.5 or 5 times a power of ten).
+function niceMax(v) {
+  const p = Math.pow(10, Math.floor(Math.log10(v))), m = v / p;
+  return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
 }
 
 // Funnel: missed calls, texted back, wrote back, booked.
@@ -326,41 +371,58 @@ function ringsHtml(s) {
     </div>`;
 }
 
-// Stacked columns: booked (green), texted back (grey), no reply (dark).
+// "Missed calls": 3D stacked blocks. Green = booked, grey = texted back, dark = no reply.
+// 7 or 30 days get a block per day; 60 days get a block per week.
 function weekChart() {
-  const days = weekDays().map(d => {
-    const booked = d.list.filter(c => c.status === 'booked').length;
-    const replied = d.list.filter(customerReplied).length - booked;
-    return { ...d, booked, replied: Math.max(0, replied), none: d.list.length - Math.max(booked, d.list.filter(customerReplied).length) };
-  });
-  const W = 960, H = 250, L = 30, B = 34, T = 30;
-  const max = Math.max(4, ...days.map(d => d.list.length));
-  const step = (W - L) / 7, bw = Math.min(64, step * 0.58);
-  const y = v => T + (H - T - B) * (1 - v / max);
-  const unit = (H - T - B) / max;
-  let svg = '';
-  const tickStep = max > 8 ? Math.ceil(max / 4) : 2;
-  for (let v = 0; v <= max; v += tickStep) {
-    svg += `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-dasharray="${v ? '3 5' : ''}"/>`;
-    svg += `<text x="${L - 10}" y="${y(v) + 4}" text-anchor="end" font-size="12" font-weight="600" fill="var(--soft)" font-family="IBM Plex Mono, monospace">${v}</text>`;
+  let buckets = rangeDays();
+  if (range > 30) {
+    const weeks = [];
+    for (let i = buckets.length; i > 0; i -= 7) {
+      const chunk = buckets.slice(Math.max(0, i - 7), i);
+      weeks.unshift({ ago: chunk[chunk.length - 1].ago, label: chunk[0].label, list: chunk.flatMap(d => d.list), span: `${chunk[0].label} to ${chunk[chunk.length - 1].label}` });
+    }
+    buckets = weeks;
   }
-  days.forEach((d, i) => {
-    const x = L + i * step + (step - bw) / 2;
-    let base = y(0);
-    let col = '';
-    [[d.booked, '#C8FF2E'], [d.replied, '#8C8C86'], [d.none, '#3A3A40']].forEach(([n, color]) => {
-      if (!n) return;
-      const h = n * unit;
-      col += `<rect x="${x}" y="${base - h + 1}" width="${bw}" height="${Math.max(h - 2, 2)}" rx="6" fill="${color}"/>`;
-      base -= h;
+  const rows = buckets.map(d => {
+    const booked = d.list.filter(c => c.status === 'booked').length;
+    const replied = Math.max(0, d.list.filter(customerReplied).length - booked);
+    return { ...d, booked, replied, none: Math.max(0, d.list.length - booked - replied) };
+  });
+  const n = rows.length, W = 960, H = 320, L = 40, R = 34, T = 48, B = 40;
+  const max = Math.max(4, ...rows.map(d => d.list.length));
+  const step = (W - L - R) / n, bw = step * 0.58;
+  const dx = Math.min(22, step * 0.3), dy = dx * 0.6;
+  const y = v => T + (H - T - B) * (1 - v / max);
+  const y0 = y(0), unit = y0 - y(1);
+  let svg = `<polygon points="${L},${y0} ${W - R},${y0} ${W - R + dx},${y0 - dy} ${L + dx},${y0 - dy}" fill="rgba(255,255,255,.03)" stroke="var(--line)"/>`;
+  const tickStep = max > 8 ? Math.ceil(max / 4) : 2;
+  for (let v = tickStep; v <= max; v += tickStep) {
+    svg += `<line x1="${L + dx}" x2="${W - R + dx}" y1="${y(v) - dy}" y2="${y(v) - dy}" stroke="var(--line)" stroke-dasharray="3 6"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="axis">${v}</text>`;
+  }
+  // [front, top, side] for each kind of block
+  const COL = { booked: ['#C8FF2E', '#E6FF94', '#8FB41E'], replied: ['#8C8C86', '#B3B3AD', '#62625D'], none: ['#3A3A40', '#55555D', '#28282D'] };
+  const every = Math.ceil(n / 10);
+  rows.forEach((d, i) => {
+    const x = L + i * step + (step - bw - dx) / 2;
+    let base = y0, col = '';
+    [['booked', d.booked], ['replied', d.replied], ['none', d.none]].forEach(([kind, count]) => {
+      if (!count) return;
+      const top = base - count * unit;
+      const [front, lid, side] = COL[kind];
+      col += `<rect x="${x}" y="${top}" width="${bw}" height="${base - top}" fill="${front}"/>`
+        + `<polygon points="${x + bw},${top} ${x + bw + dx},${top - dy} ${x + bw + dx},${base - dy} ${x + bw},${base}" fill="${side}"/>`
+        + `<polygon points="${x},${top} ${x + dx},${top - dy} ${x + bw + dx},${top - dy} ${x + bw},${top}" fill="${lid}"/>`;
+      base = top;
     });
-    const tip = `${d.label}: ${d.list.length} missed, ${d.booked + d.replied} texted back, ${d.booked} booked`;
-    svg += `<g class="col" style="--i: ${i}">${col}</g>`;
-    if (d.list.length) svg += `<text x="${x + bw / 2}" y="${y(d.list.length) - 10}" text-anchor="middle" font-size="18" font-weight="900" fill="var(--ink)" font-family="Archivo, sans-serif">${d.list.length}</text>`;
-    svg += `<text x="${x + bw / 2}" y="${H - 8}" text-anchor="middle" font-size="13" font-weight="600" fill="${d.ago === 0 ? '#C8FF2E' : 'var(--soft)'}" font-family="IBM Plex Mono, monospace">${esc(d.label)}</text>`;
+    const today = d.ago === 0;
+    if (today && d.list.length) svg += `<ellipse cx="${x + (bw + dx) / 2}" cy="${y0 - dy / 2}" rx="${bw * 0.9 + 6}" ry="${dy + 6}" fill="#C8FF2E" opacity=".22" filter="url(#colGlow)"/>`;
+    svg += `<g class="col" style="--i: ${(i * 7 / n).toFixed(2)}">${col}</g>`;
+    if (d.list.length && (n <= 14 || d.list.length === max)) svg += `<text x="${x + (bw + dx) / 2}" y="${base - dy - 10}" text-anchor="middle" class="col-num">${d.list.length}</text>`;
+    if ((i % every === 0 && n - 1 - i >= every / 2) || today) svg += `<text x="${x + bw / 2}" y="${H - 10}" text-anchor="middle" class="axis${today ? ' today' : ''}">${esc(d.label)}</text>`;
+    const tip = `${d.span || d.label}: ${d.list.length} missed, ${d.booked + d.replied} texted back, ${d.booked} booked`;
     svg += `<rect x="${L + i * step}" y="0" width="${step}" height="${H}" fill="transparent" data-tip="${esc(tip)}"/>`;
   });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Missed calls per day for the last 7 days">${svg}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Missed calls over the last ${range} days"><defs><filter id="colGlow" x="-50%" y="-100%" width="200%" height="300%"><feGaussianBlur stdDeviation="8"/></filter></defs>${svg}</svg>`;
 }
 
 // Only in test mode: pretend to be a caller.
@@ -798,6 +860,8 @@ main.addEventListener('toggle', e => {
 }, true);
 
 main.addEventListener('click', async e => {
+  const rangeBtn = e.target.closest('[data-range]');
+  if (rangeBtn) { range = Number(rangeBtn.dataset.range); animateNext = true; render(); return; }
   const open = e.target.closest('[data-open]');
   if (open) {
     openId = Number(open.dataset.open);

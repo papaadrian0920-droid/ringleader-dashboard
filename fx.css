@@ -46,3 +46,26 @@
   .app::before, .app::after, .hero-money { animation: none; }
   .nav-blob { transition: none; }
 }
+
+/* ---------- Today: 7 / 30 / 60 day switch ---------- */
+.range-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.range { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); }
+.range button { border: 0; background: transparent; color: var(--soft); font: 600 .78rem/1 var(--f-mono); letter-spacing: .04em; padding: 7px 11px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
+.range button:hover { color: var(--ink); background: var(--panel-2); }
+.range button[aria-pressed="true"] { background: var(--hivis); color: var(--on-hivis); }
+.status-line .link { margin-left: 4px; }
+
+/* ---------- the two charts ---------- */
+.axis { font: 600 12px var(--f-mono); fill: var(--soft); }
+.axis.today { fill: var(--hivis); }
+.col-num { font: 900 18px var(--f-display); fill: var(--ink); }
+.flag-text { font: 700 13px var(--f-mono); fill: var(--ink); letter-spacing: .02em; }
+.day-bar { fill: rgba(200, 255, 46, .16); }
+.week svg, .money-card svg { overflow: visible; }
+.week .col { transition: filter .2s; }
+.week .col:hover { filter: brightness(1.15); }
+
+/* the big number sizes itself to its column, so $44,020 fits as well as $4,120 */
+.hero-copy { container-type: inline-size; min-width: 0; }
+.hero-money { font-size: min(9.5rem, 19cqi); }
+@media (max-width: 860px) { .hero-money { font-size: min(9.5rem, 21cqi); } }

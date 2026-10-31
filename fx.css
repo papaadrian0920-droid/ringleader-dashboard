@@ -1,0 +1,48 @@
+/* Extras on top of style.css: the 3D call radar, a slow-moving glow behind everything,
+   the sliding menu highlight, and cards that light up under the cursor. fx.js drives the moving parts. */
+
+/* a slow green glow drifting behind the whole app */
+.app::before, .app::after { content: ""; position: fixed; z-index: -1; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(80px); pointer-events: none; opacity: .5; }
+.app::before { left: -20vmax; top: -25vmax; background: radial-gradient(circle, rgba(200, 255, 46, .12), transparent 65%); animation: drift 26s ease-in-out infinite alternate; }
+.app::after { right: -25vmax; top: 20vh; background: radial-gradient(circle, rgba(120, 200, 160, .07), transparent 65%); animation: drift 32s ease-in-out infinite alternate-reverse; }
+@keyframes drift { to { transform: translate(14vmax, 10vmax) scale(1.15); } }
+
+/* ---------- Today: the radar ---------- */
+.hero { align-items: center; }
+.hero-viz { position: relative; display: grid; gap: 6px; }
+.radar-slot { position: relative; height: clamp(320px, 36vw, 470px); margin: -20px -10px 0; }
+.radar { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: grab; }
+.radar-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-family: var(--f-mono); font-size: .74rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--soft); }
+.radar-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.radar-legend i { width: 10px; height: 10px; border-radius: 50%; }
+.lg-booked { background: var(--hivis); box-shadow: 0 0 10px var(--hivis-glow); }
+.lg-replied { background: var(--ink); }
+.lg-none { background: #55555C; }
+@media (max-width: 860px) { .radar-slot { height: min(92vw, 400px); margin: 0 -8px; } }
+
+/* the big number gets a slow sheen across it */
+.hero-money { background: linear-gradient(100deg, var(--hivis) 0 42%, #F2FFC9 50%, var(--hivis) 58% 100%) 0 0 / 260% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(0 0 40px rgba(200, 255, 46, .25)); animation: sheen 7s ease-in-out infinite; }
+@keyframes sheen { 0%, 55% { background-position: 100% 0; } 100% { background-position: -60% 0; } }
+
+/* ---------- menu: one highlight that slides to the page you're on ---------- */
+@media (min-width: 721px) { .nav { position: relative; } } /* on phones it's already fixed to the bottom */
+.nav a { position: relative; z-index: 1; }
+.nav a.active { background: transparent; }
+.nav-blob { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 999px; background: var(--hivis); box-shadow: 0 0 24px var(--hivis-glow); transition: transform .5s var(--ease), width .5s var(--ease), height .5s var(--ease), opacity .3s; pointer-events: none; }
+
+/* ---------- cards ---------- */
+.card { transition: border-color .3s, transform .4s var(--ease); }
+.card::after { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .35s; background: radial-gradient(520px circle at var(--mx, 50%) var(--my, 0%), rgba(200, 255, 46, .075), transparent 42%); }
+.card:hover { border-color: rgba(200, 255, 46, .3); }
+.card:hover::after { opacity: 1; }
+.job { transition: transform .35s var(--ease), border-color .3s, box-shadow .3s; transform-style: preserve-3d; will-change: transform; }
+.job .quote { transform: translateZ(18px); }
+.money-card .hero-chart svg { max-height: 280px; }
+
+/* pages arrive with a little blur, not just a slide */
+@media (min-width: 721px) { @keyframes in { from { opacity: 0; transform: translateY(18px) scale(.985); filter: blur(6px); } } }
+
+@media (prefers-reduced-motion: reduce) {
+  .app::before, .app::after, .hero-money { animation: none; }
+  .nav-blob { transition: none; }
+}

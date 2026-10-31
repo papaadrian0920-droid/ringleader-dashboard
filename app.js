@@ -156,7 +156,10 @@ function overviewPage() {
         <p class="hero-sub">${s.money ? `in jobs booked from <span class="hi">calls you missed</span>.` : 'in booked jobs so far. They stack up here as calls turn into work.'}</p>
         <p class="status-line">${statusLine}</p>
       </div>
-      <div class="hero-chart">${heroChart()}</div>
+      <div class="hero-viz">
+        <div class="radar-slot" aria-hidden="true"></div>
+        <p class="radar-legend"><span><i class="lg-booked"></i>Booked (taller = bigger job)</span><span><i class="lg-replied"></i>Texted back</span><span><i class="lg-none"></i>No reply</span></p>
+      </div>
     </section>
 
     ${tickerHtml()}
@@ -181,6 +184,11 @@ function overviewPage() {
         <div class="card-head"><h2>How it's going</h2></div>
         ${ringsHtml(s)}
       </div>
+    </section>
+
+    <section class="card money-card">
+      <div class="card-head"><h2>Booked, adding up</h2><span class="note">${money(s.money)} this week</span></div>
+      <div class="hero-chart">${heroChart()}</div>
     </section>
 
     <section class="card week">
@@ -735,6 +743,8 @@ function render() {
   const msgs = document.getElementById('msgs');
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
   if (animate) countUp();
+  // fx.js listens for this to draw the call radar and the menu highlight
+  window.dispatchEvent(new CustomEvent('rl:render', { detail: { page, animate } }));
 }
 
 // The big dollar number counts up from zero.

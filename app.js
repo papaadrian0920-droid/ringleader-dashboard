@@ -674,7 +674,13 @@ function autotextPage() {
               </div>`).join('')}
           </div>`)}
 
-        ${section('06', 'Setup', `
+        ${section('06', 'Never text these numbers', `
+          <div class="field">
+            <textarea id="never-text" aria-label="Never text these numbers" placeholder="(905) 555-0123">${esc((a.neverText || []).join('\n'))}</textarea>
+            <p class="note">One number per line. Family, friends, suppliers: their missed calls won't get a text.</p>
+          </div>`)}
+
+        ${section('07', 'Setup', `
           <ul class="checks">${data.setup.map(s => `<li class="${s.done ? 'done' : ''}">${esc(s.label)}</li>`).join('')}</ul>
           <p class="note">Your Ringleader number: <b>${esc(data.business.ringleaderNumber || 'not set up yet')}</b></p>`)}
 
@@ -724,6 +730,7 @@ function readSettingsForm() {
     followUpMessage: document.getElementById('msg-follow').value,
     summaryOn: document.getElementById('summary-on').checked,
     summaryTime: document.getElementById('summary-time').value,
+    neverText: document.getElementById('never-text').value.split('\n').map(n => n.trim()).filter(Boolean),
     hours: data.hours.map((h, i) => document.getElementById('open-' + i).checked
       ? { day: h.day, open: document.getElementById('from-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1'), close: document.getElementById('to-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1') }
       : { day: h.day, open: null, close: null })

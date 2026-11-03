@@ -176,3 +176,21 @@
   .nav a.active::before { content: ""; position: absolute; top: 0; left: calc(50% - 18px); width: 36px; height: 3px; border-radius: 0 0 3px 3px; background: var(--hivis); }
   .nav svg { width: 22px; height: 22px; }
 }
+.inbox-list .tag { display: none; } /* phones only (see below) */
+@media (max-width: 860px) {
+  /* Texts list: short rows. Name and day on top, one line of preview, a short tag on the right. */
+  .inbox-list button { grid-template-columns: 42px minmax(0, 1fr) auto; row-gap: 2px; padding: 12px; border-radius: 16px; align-items: center; }
+  .inbox-list .av { grid-row: span 2; }
+  .inbox-list b { font-size: 1.02rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .inbox-list .preview { -webkit-line-clamp: 1; font-size: .92rem; }
+  /* the long status pills give way to the short tag */
+  .inbox-list .pills { display: none; }
+  .inbox-list button > .tag { display: inline-block; grid-column: 3; grid-row: 1 / span 2; font: 600 .66rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--hivis); color: var(--hivis); }
+  .inbox-list .tag.waiting { background: var(--hivis); color: var(--on-hivis); }
+  .inbox-list .tag.gathering { border-style: dashed; }
+  .inbox-list .tag.booked { border: 0; padding: 0; font-size: .82rem; }
+  .inbox-list .tag.opted-out { border-color: var(--red); color: var(--red); }
+  /* the list is its own screen on phones, so "last one opened" isn't highlighted. Rows that need you get a green tint. */
+  .inbox-list button.active { border-color: var(--line); background: var(--panel); box-shadow: none; }
+  .inbox-list button.waiting, .inbox-list button.ready { border-color: rgba(200, 255, 46, .3); background: rgba(200, 255, 46, .05); }
+}

@@ -545,8 +545,16 @@ function listItem(x) {
       <span class="av ${x.status}" aria-hidden="true">${esc(initials(x))}</span>
       <span class="top"><b>${esc(who(x))}</b><time>${dayName(x.daysAgo)}</time></span>
       <span class="preview">${esc(line)}</span>
-      <span><span class="pill ${x.status}">${STATUS[x.status]}${progress}${x.status === 'booked' ? ' ' + money(x.value) : ''}</span>${x.details?.timingAsked && x.status !== 'booked' ? '<span class="pill timing">Asked timing</span>' : ''}</span>
+      <span class="pills"><span class="pill ${x.status}">${STATUS[x.status]}${progress}${x.status === 'booked' ? ' ' + money(x.value) : ''}</span>${x.details?.timingAsked && x.status !== 'booked' ? '<span class="pill timing">Asked timing</span>' : ''}</span>
+      ${shortTag(x)}
     </button>`;
+}
+
+// Phones only have room for a short tag on the right (or none, when there's nothing to do yet).
+function shortTag(x) {
+  if (x.status === 'booked') return `<span class="tag booked">${money(x.value)}</span>`;
+  const tag = { waiting: 'Needs you', ready: 'Ready', gathering: 'AI asking', 'opted-out': 'STOP' }[x.status];
+  return tag ? `<span class="tag ${x.status}">${tag}</span>` : '';
 }
 
 function messageLabel(m, c) {

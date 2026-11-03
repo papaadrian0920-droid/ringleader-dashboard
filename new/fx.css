@@ -156,3 +156,23 @@
   /* Today: no 3D radar on a small screen. The money, the jobs and the simple charts say enough. */
   .hero-viz { display: none; }
 }
+@media (max-width: 860px) {
+  /* Flat, no glow: things stay green, they just don't light up */
+  .app::before, .app::after, body::before { display: none; }
+  .hero-money { animation: none; filter: none; }
+  .logo-mark, .av.ready, .sys.booked, .meter i, .f-row.win .f-fill, .feed .dot.booked, .feed .dot.ready, .state.ready, .lg-booked { box-shadow: none; }
+  .ring .arc, .ring-mini .fg { filter: none; }
+  .page-title .hi { text-shadow: none; }
+  /* the ticker is a flat green bar inside the page, not a tilted strip across it */
+  .ticker { transform: none; margin-inline: 0; border: 0; border-radius: 999px; }
+}
+@media (max-width: 720px) {
+  /* the bottom menu: a plain bar across the bottom, like an app. The page you're on is green with a line on top. */
+  .nav { left: 0; right: 0; bottom: 0; border-radius: 0; border: 0; border-top: 1px solid var(--line); background: var(--bg); box-shadow: none; padding: 0 0 env(safe-area-inset-bottom); gap: 0; }
+  .nav-blob { display: none; }
+  .nav a { padding: 10px 4px 8px; border-radius: 0; color: var(--mid); font-family: var(--f-mono); font-size: .66rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .nav a:hover { background: transparent; }
+  .nav a.active { color: var(--hivis); }
+  .nav a.active::before { content: ""; position: absolute; top: 0; left: calc(50% - 18px); width: 36px; height: 3px; border-radius: 0 0 3px 3px; background: var(--hivis); }
+  .nav svg { width: 22px; height: 22px; }
+}

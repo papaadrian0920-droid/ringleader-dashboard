@@ -126,3 +126,27 @@
 /* the page itself: one column that can't be pushed wider than the screen (the filter tabs scroll instead) */
 .main { grid-template-columns: minmax(0, 1fr); }
 .page-top > * { min-width: 0; max-width: 100%; }
+
+/* ---------- Phones: works like an app ---------- */
+.back { display: none; }
+@media (max-width: 860px) {
+  /* Texts: the list fills the screen. Tap someone to open their texts; "All texts" goes back. */
+  .inbox-side .inbox-list { max-height: none; overflow: visible; padding: 0; }
+  .inbox-list .group { position: static; background: none; }
+  .inbox:not(.chat-open) > .thread, .inbox:not(.chat-open) > .job-panel { display: none; }
+  .inbox.chat-open > .inbox-side, .page-top.chat-open { display: none; }
+  .inbox.chat-open { grid-template-areas: "thread" "job"; }
+  .back { display: inline-flex; align-items: center; gap: 8px; flex-basis: 100%; min-height: 44px; margin: -6px 0 0 -4px; padding: 0 4px; border: 0; background: none; color: var(--hivis); font: 700 1rem var(--f-body); cursor: pointer; }
+  /* the texts, the quick replies and the reply box all fit on one screen */
+  .msgs { max-height: max(220px, calc(100dvh - 570px)); }
+  .thread-head { padding: 14px 16px; }
+  .thread-who b { font-size: 1.35rem; }
+  .thread-head .thread-who { flex: 1 1 calc(100% - 80px); }
+  .thread-head > .pill { margin: -4px 0 0 66px; }
+  .quick button { padding: 10px 14px; }
+}
+@media (max-width: 720px) {
+  /* bigger tap targets */
+  .range button { padding: 12px 14px; }
+  .thread-who .edit { min-height: 36px; padding-inline: 12px; }
+}

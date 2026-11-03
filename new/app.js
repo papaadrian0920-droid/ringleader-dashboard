@@ -475,6 +475,10 @@ let filter = 'all';
 let search = ''; // what's typed in the search box above the list
 let openId = null;
 let editingName = false;
+// On phones the list and the open conversation are two screens, like a texting app.
+let chatOpen = false;
+let chatInHistory = false; // true when the phone's Back button should close the chat
+const isPhone = () => matchMedia('(max-width: 860px)').matches;
 
 const FILTERS = [
   ['all', 'All', () => true],
@@ -515,14 +519,14 @@ function conversationsPage() {
   const c = data.conversations.find(x => x.id === openId);
 
   return `
-    <header class="page-top">
+    <header class="page-top${chatOpen ? ' chat-open' : ''}">
       <h1 class="page-title">Texts<span class="hi">.</span></h1>
       <div class="tabs" role="group" aria-label="Filter conversations">
         ${FILTERS.map(([key, label, fn]) => `<button type="button" data-filter="${key}" aria-pressed="${filter === key}">${label}<span class="n">${data.conversations.filter(fn).length}</span></button>`).join('')}
       </div>
     </header>
 
-    <section class="inbox">
+    <section class="inbox${chatOpen ? ' chat-open' : ''}">
       <div class="inbox-side">
         <label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span hidden>Search</span><input id="search" type="search" placeholder="Search names, numbers, texts" value="${esc(search)}" autocomplete="off"></label>
         <div class="inbox-list">${listHtml(list)}</div>
@@ -555,6 +559,7 @@ function threadHtml(c) {
   return `
     <div class="thread">
       <div class="thread-head">
+        <button type="button" class="back" data-back><span aria-hidden="true">←</span> All texts</button>
         <span class="av big ${c.status}" aria-hidden="true">${esc(initials(c))}</span>
         <div class="thread-who">
           ${c.name && !editingName
@@ -870,7 +875,30 @@ async function refresh() {
   render();
 }
 
-window.addEventListener('hashchange', () => { animateNext = true; render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => {
+  if (currentPage() !== 'conversations') chatOpen = chatInHistory = false;
+  animateNext = true; render(); window.scrollTo(0, 0);
+});
+
+// Phones: close the open chat and show the list again.
+function closeChat() {
+  if (chatInHistory) { history.back(); return; } // the popstate below does the rest
+  chatOpen = false;
+  render(); window.scrollTo(0, 0);
+}
+// The phone's Back button (or swipe back) closes an open chat instead of leaving the page.
+window.addEventListener('popstate', () => {
+  if (!chatInHistory) return;
+  chatOpen = chatInHistory = false;
+  render(); window.scrollTo(0, 0);
+});
+// Tapping "Texts" in the menu while a chat is open goes back to the list.
+document.querySelector('.nav').addEventListener('click', e => {
+  if (e.target.closest('[data-page="conversations"]') && currentPage() === 'conversations' && chatOpen) {
+    e.preventDefault();
+    closeChat();
+  }
+});
 
 // Check for new texts every 15 seconds, unless you're in the middle of typing.
 setInterval(() => {
@@ -907,9 +935,16 @@ main.addEventListener('click', async e => {
   if (open) {
     openId = Number(open.dataset.open);
     editingName = false;
-    if (location.hash === '#conversations') { e.preventDefault(); render(); }
+    chatOpen = true;
+    if (location.hash === '#conversations') {
+      e.preventDefault();
+      if (isPhone() && !chatInHistory) { history.pushState({ chat: true }, ''); chatInHistory = true; }
+      render();
+      if (isPhone()) window.scrollTo(0, 0);
+    }
     return;
   }
+  if (e.target.closest('[data-back]')) { closeChat(); return; }
   if (e.target.closest('[data-edit-name]')) {
     editingName = true;
     render();

@@ -268,7 +268,9 @@ function heroChart() {
   const dailySum = daily.map(list => list.reduce((sum, c) => sum + c.value, 0));
   let total = 0;
   const running = dailySum.map(v => (total += v));
-  const W = 960, H = 300, L = 62, R = 26, T = 40, B = 36;
+  // Phones get a narrower, flat chart, so the labels don't shrink to nothing
+  const phone = isPhone();
+  const W = phone ? 360 : 960, H = phone ? 230 : 300, L = phone ? 46 : 62, R = phone ? 16 : 26, T = 40, B = phone ? 30 : 36;
   const max = niceMax(Math.max(...running, 100));
   const maxDay = Math.max(...dailySum, 1);
   const step = (W - L - R) / (n - 1);
@@ -278,21 +280,21 @@ function heroChart() {
   const line = smoothPath(pts);
   const area = `${line} L${x(n - 1)},${y(0)} L${x(0)},${y(0)} Z`;
   const best = dailySum.indexOf(Math.max(...dailySum));
-  const every = Math.ceil(n / 8);
+  const every = phone && n <= 7 ? 1 : Math.ceil(n / (phone ? 4 : 8));
   let svg = '';
   for (let k = 0; k <= 4; k++) {
     const v = max * k / 4;
     svg += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"${k ? ' stroke-dasharray="3 6"' : ''}/><text x="${L - 12}" y="${y(v) + 4}" text-anchor="end" class="axis">${shortMoney(v)}</text>`;
   }
   // each day's bookings as a faint bar, scaled to the busiest day
-  const bw = Math.max(3, Math.min(28, step * 0.55));
+  const bw = Math.max(3, Math.min(phone ? 16 : 28, step * 0.55));
   days.forEach((d, i) => {
     if (!dailySum[i]) return;
     const h = (H - T - B) * 0.42 * dailySum[i] / maxDay;
     svg += `<rect class="day-bar fade-in" x="${x(i) - bw / 2}" y="${y(0) - h}" width="${bw}" height="${h}" rx="${Math.min(4, bw / 2)}"/>`;
   });
   svg += `<path class="fade-in" d="${area}" fill="url(#heroFill)"/>`;
-  svg += `<path d="${line}" fill="none" stroke="#C8FF2E" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".22" filter="url(#heroGlow)"/>`;
+  if (!phone) svg += `<path d="${line}" fill="none" stroke="#C8FF2E" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".22" filter="url(#heroGlow)"/>`;
   svg += `<path class="draw" d="${line}" fill="none" stroke="url(#heroLine)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>`;
   if (n <= 30) pts.forEach(([px, py], i) => { if (dailySum[i]) svg += `<circle class="fade-in" cx="${px}" cy="${py}" r="${n > 7 ? 3.5 : 5}" fill="var(--bg)" stroke="#C8FF2E" stroke-width="2"/>`; });
   // a flag on the best day
@@ -303,7 +305,8 @@ function heroChart() {
   }
   // the total so far, pulsing at the end of the line
   const [lx, ly] = pts[n - 1];
-  svg += `<circle cx="${lx}" cy="${ly}" r="16" fill="#C8FF2E" opacity=".16"><animate attributeName="r" values="10;22;10" dur="2.4s" repeatCount="indefinite"/></circle><circle class="fade-in" cx="${lx}" cy="${ly}" r="7" fill="#C8FF2E"/>`;
+  if (!phone) svg += `<circle cx="${lx}" cy="${ly}" r="16" fill="#C8FF2E" opacity=".16"><animate attributeName="r" values="10;22;10" dur="2.4s" repeatCount="indefinite"/></circle>`;
+  svg += `<circle class="fade-in" cx="${lx}" cy="${ly}" r="${phone ? 5 : 7}" fill="#C8FF2E"/>`;
   days.forEach((d, i) => { if ((i % every === 0 && n - 1 - i >= every / 2) || i === n - 1) svg += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" class="axis${d.ago === 0 ? ' today' : ''}">${esc(d.label)}</text>`; });
   days.forEach((d, i) => {
     const jobs = daily[i].length;
@@ -388,20 +391,25 @@ function weekChart() {
     const replied = Math.max(0, d.list.filter(customerReplied).length - booked);
     return { ...d, booked, replied, none: Math.max(0, d.list.length - booked - replied) };
   });
-  const n = rows.length, W = 960, H = 320, L = 40, R = 34, T = 48, B = 40;
+  // Phones get a narrower chart with flat blocks (no 3D sides), so it reads at a glance
+  const phone = isPhone();
+  const n = rows.length, W = phone ? 360 : 960, H = phone ? 250 : 320, L = phone ? 8 : 40, R = phone ? 8 : 34, T = 48, B = 40;
   const max = Math.max(4, ...rows.map(d => d.list.length));
-  const step = (W - L - R) / n, bw = step * 0.58;
-  const dx = Math.min(22, step * 0.3), dy = dx * 0.6;
+  const step = (W - L - R) / n, bw = step * (phone ? 0.66 : 0.58);
+  const dx = phone ? 0 : Math.min(22, step * 0.3), dy = dx * 0.6;
   const y = v => T + (H - T - B) * (1 - v / max);
   const y0 = y(0), unit = y0 - y(1);
-  let svg = `<polygon points="${L},${y0} ${W - R},${y0} ${W - R + dx},${y0 - dy} ${L + dx},${y0 - dy}" fill="rgba(255,255,255,.03)" stroke="var(--line)"/>`;
-  const tickStep = max > 8 ? Math.ceil(max / 4) : 2;
-  for (let v = tickStep; v <= max; v += tickStep) {
-    svg += `<line x1="${L + dx}" x2="${W - R + dx}" y1="${y(v) - dy}" y2="${y(v) - dy}" stroke="var(--line)" stroke-dasharray="3 6"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="axis">${v}</text>`;
+  let svg = '';
+  if (!phone) {
+    svg += `<polygon points="${L},${y0} ${W - R},${y0} ${W - R + dx},${y0 - dy} ${L + dx},${y0 - dy}" fill="rgba(255,255,255,.03)" stroke="var(--line)"/>`;
+    const tickStep = max > 8 ? Math.ceil(max / 4) : 2;
+    for (let v = tickStep; v <= max; v += tickStep) {
+      svg += `<line x1="${L + dx}" x2="${W - R + dx}" y1="${y(v) - dy}" y2="${y(v) - dy}" stroke="var(--line)" stroke-dasharray="3 6"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="axis">${v}</text>`;
+    }
   }
   // [front, top, side] for each kind of block
   const COL = { booked: ['#C8FF2E', '#E6FF94', '#8FB41E'], replied: ['#8C8C86', '#B3B3AD', '#62625D'], none: ['#3A3A40', '#55555D', '#28282D'] };
-  const every = Math.ceil(n / 10);
+  const every = phone && n <= 7 ? 1 : Math.ceil(n / (phone ? 5 : 10));
   rows.forEach((d, i) => {
     const x = L + i * step + (step - bw - dx) / 2;
     let base = y0, col = '';
@@ -409,13 +417,16 @@ function weekChart() {
       if (!count) return;
       const top = base - count * unit;
       const [front, lid, side] = COL[kind];
-      col += `<rect x="${x}" y="${top}" width="${bw}" height="${base - top}" fill="${front}"/>`
+      if (phone) col += `<rect x="${x}" y="${top + 2}" width="${bw}" height="${Math.max(1, base - top - 4)}" rx="${Math.min(6, bw / 4)}" fill="${front}"/>`;
+      else col += `<rect x="${x}" y="${top}" width="${bw}" height="${base - top}" fill="${front}"/>`
         + `<polygon points="${x + bw},${top} ${x + bw + dx},${top - dy} ${x + bw + dx},${base - dy} ${x + bw},${base}" fill="${side}"/>`
         + `<polygon points="${x},${top} ${x + dx},${top - dy} ${x + bw + dx},${top - dy} ${x + bw},${top}" fill="${lid}"/>`;
       base = top;
     });
     const today = d.ago === 0;
-    if (today && d.list.length) svg += `<ellipse cx="${x + (bw + dx) / 2}" cy="${y0 - dy / 2}" rx="${bw * 0.9 + 6}" ry="${dy + 6}" fill="#C8FF2E" opacity=".22" filter="url(#colGlow)"/>`;
+    // Today: a soft green column behind it on phones, a glow on the floor on computers
+    if (today && phone) svg += `<rect x="${x - 5}" y="${base - 34}" width="${bw + 10}" height="${H - base + 30}" rx="10" fill="rgba(200, 255, 46, .1)"/>`;
+    else if (today && d.list.length) svg += `<ellipse cx="${x + (bw + dx) / 2}" cy="${y0 - dy / 2}" rx="${bw * 0.9 + 6}" ry="${dy + 6}" fill="#C8FF2E" opacity=".22" filter="url(#colGlow)"/>`;
     svg += `<g class="col" style="--i: ${(i * 7 / n).toFixed(2)}">${col}</g>`;
     if (d.list.length && (n <= 14 || d.list.length === max)) svg += `<text x="${x + (bw + dx) / 2}" y="${base - dy - 10}" text-anchor="middle" class="col-num">${d.list.length}</text>`;
     if ((i % every === 0 && n - 1 - i >= every / 2) || today) svg += `<text x="${x + bw / 2}" y="${H - 10}" text-anchor="middle" class="axis${today ? ' today' : ''}">${esc(d.label)}</text>`;

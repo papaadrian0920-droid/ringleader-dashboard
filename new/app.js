@@ -767,7 +767,17 @@ function autotextPage() {
             <p class="note">One number per line. Family, friends, suppliers: their missed calls won't get a text.</p>
           </div>`)}
 
-        ${section('07', 'Setup', `
+        ${section('07', 'Send ready jobs out', `
+          <div class="field">
+            <label for="job-link">Link <span class="opt">(optional)</span></label>
+            <div class="link-row">
+              <input id="job-link" type="url" inputmode="url" placeholder="https://" value="${esc(a.jobLink || '')}" autocomplete="off" spellcheck="false">
+              <button class="btn" type="button" id="test-link">Send a test</button>
+            </div>
+            <p class="note">When a job is ready to book, or you mark it booked, Ringleader sends all its details to this link. Paste a link from n8n or Zapier to put jobs into Jobber, Housecall Pro or a Google Sheet. Leave it blank to turn it off.</p>
+          </div>`)}
+
+        ${section('08', 'Setup', `
           <ul class="checks">${data.setup.map(s => `<li class="${s.done ? 'done' : ''}">${esc(s.label)}</li>`).join('')}</ul>
           <p class="note">Your Ringleader number: <b>${esc(data.business.ringleaderNumber || 'not set up yet')}</b></p>`)}
 
@@ -818,6 +828,7 @@ function readSettingsForm() {
     summaryOn: document.getElementById('summary-on').checked,
     summaryTime: document.getElementById('summary-time').value,
     neverText: document.getElementById('never-text').value.split('\n').map(n => n.trim()).filter(Boolean),
+    jobLink: document.getElementById('job-link').value.trim(),
     hours: data.hours.map((h, i) => document.getElementById('open-' + i).checked
       ? { day: h.day, open: document.getElementById('from-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1'), close: document.getElementById('to-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1') }
       : { day: h.day, open: null, close: null })
@@ -1019,6 +1030,16 @@ main.addEventListener('click', async e => {
     previewWhich = pv.dataset.preview;
     document.querySelectorAll('[data-preview]').forEach(b => b.setAttribute('aria-pressed', String(b === pv)));
     updateAutotext();
+    return;
+  }
+  if (e.target.id === 'test-link') {
+    if (mode === 'example') { toast('Start the server to send a test.'); return; }
+    try {
+      await api('/api/settings/test-job-link', { jobLink: document.getElementById('job-link').value.trim() });
+      toast('Test job sent. Check your n8n or Zapier.');
+    } catch (err) {
+      toast(err.message, true);
+    }
     return;
   }
   if (e.target.id === 'save') {

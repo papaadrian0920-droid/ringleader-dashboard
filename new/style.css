@@ -425,3 +425,8 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Settings: the job link and its Send a test button */
+.link-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.link-row input { flex: 1 1 220px; min-width: 0; }
+.field .opt { font-weight: 500; color: var(--mid); }

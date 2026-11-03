@@ -194,3 +194,16 @@
   .inbox-list button.active { border-color: var(--line); background: var(--panel); box-shadow: none; }
   .inbox-list button.waiting, .inbox-list button.ready { border-color: rgba(200, 255, 46, .3); background: rgba(200, 255, 46, .05); }
 }
+
+/* ---------- Today: "See how it's going" opens and closes the charts ---------- */
+.fold { display: grid; gap: clamp(16px, 2.5vw, 24px); }
+.fold-btn { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title chev" "sum chev"; align-items: center; gap: 4px 16px; width: 100%; text-align: left; padding: 18px 22px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; font: inherit; transition: border-color .2s, background .2s; }
+.fold-btn:hover { border-color: rgba(200, 255, 46, .3); background: var(--panel-2); }
+.fold-title { grid-area: title; font-family: var(--f-display); font-weight: 900; font-stretch: 115%; font-size: clamp(1.15rem, 2.4vw, 1.45rem); }
+.fold-sum { grid-area: sum; font: 600 .82rem var(--f-mono); letter-spacing: .03em; color: var(--hivis); min-width: 0; }
+.fold-chev { grid-area: chev; width: 40px; height: 40px; padding: 9px; border-radius: 50%; background: var(--panel-2); color: var(--hivis); transition: transform .35s var(--ease); }
+.fold-btn[aria-expanded="true"] .fold-chev { transform: rotate(180deg); }
+.fold-body { display: grid; gap: clamp(16px, 2.5vw, 24px); min-width: 0; }
+.fold-body[hidden] { display: none; }
+@media (max-width: 720px) { .fold-btn { padding: 16px 18px; } }
+@media (prefers-reduced-motion: reduce) { .fold-chev { transition: none; } }

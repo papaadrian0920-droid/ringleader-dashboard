@@ -189,40 +189,69 @@ function overviewPage() {
         : `<div class="all-clear"><b>All clear.</b><p class="empty">Nobody is waiting on you. New texts show up here.</p></div>`}
     </section>
 
-    <section class="grid-2">
-      <div class="card">
-        <div class="card-head"><h2>Missed call <span class="hi">&rarr;</span> booked job</h2></div>
-        ${funnelHtml(s)}
-      </div>
-      <div class="card">
-        <div class="card-head"><h2>How it's going</h2></div>
-        ${ringsHtml(s)}
-      </div>
-    </section>
-
-    <section class="card money-card">
-      <div class="card-head"><h2>Booked, adding up</h2><span class="note">${money(s.money)} in ${range} days</span></div>
-      <div class="hero-chart">${heroChart()}</div>
-    </section>
-
-    <section class="card week">
-      <div class="card-head">
-        <h2>Missed calls by ${range > 30 ? 'week' : 'day'}</h2>
-        <div class="legend">
-          <span><i style="background: var(--hivis)"></i>Booked</span>
-          <span><i style="background: var(--mid)"></i>Texted back</span>
-          <span><i style="background: var(--dim)"></i>No reply</span>
-        </div>
-      </div>
-      ${weekChart()}
-    </section>
-
     <section class="card">
       <div class="card-head"><h2>Recent</h2>${recent.length ? `<a class="link" href="#conversations">All texts &rarr;</a>` : ''}</div>
       ${recent.length ? `<div class="feed">${recent.map(feedRow).join('')}</div>`
         : `<p class="empty">No missed calls yet. When a call is missed, it shows up here.</p>`}
     </section>
+
+    <section class="fold" aria-label="How it's going">
+      <button type="button" class="fold-btn" data-fold aria-expanded="${foldOpen()}" aria-controls="fold-body">
+        <span class="fold-title">See how it's going</span>
+        <span class="fold-sum">Reply ${pct(s.replied, s.texted)}% · Book ${pct(s.booked, s.replied)}% · Avg ${s.booked ? money(s.money / s.booked) : '$0'}</span>
+        <svg class="fold-chev" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <div class="fold-body" id="fold-body" ${foldOpen() ? '' : 'hidden'}>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head"><h2>Missed call <span class="hi">&rarr;</span> booked job</h2></div>
+            ${funnelHtml(s)}
+          </div>
+          <div class="card">
+            <div class="card-head"><h2>How it's going</h2></div>
+            ${ringsHtml(s)}
+          </div>
+        </div>
+
+        <div class="card money-card">
+          <div class="card-head"><h2>Booked, adding up</h2><span class="note">${money(s.money)} in ${range} days</span></div>
+          <div class="hero-chart">${heroChart()}</div>
+        </div>
+
+        <div class="card week">
+          <div class="card-head">
+            <h2>Missed calls by ${range > 30 ? 'week' : 'day'}</h2>
+            <div class="legend">
+              <span><i style="background: var(--hivis)"></i>Booked</span>
+              <span><i style="background: var(--mid)"></i>Texted back</span>
+              <span><i style="background: var(--dim)"></i>No reply</span>
+            </div>
+          </div>
+          ${weekChart()}
+        </div>
+      </div>
+    </section>
   `;
+}
+
+// "See how it's going" on Today: closed on phones, open on computers, until the owner picks.
+// Their pick is remembered, so the 15-second refresh and the 7d/30d/60d switch don't undo it.
+const FOLD_KEY = 'rl-today-charts';
+function foldOpen() {
+  try {
+    const saved = localStorage.getItem(FOLD_KEY);
+    if (saved) return saved === 'open';
+  } catch {}
+  return !matchMedia('(max-width: 720px)').matches;
+}
+function toggleFold(btn) {
+  const open = btn.getAttribute('aria-expanded') !== 'true';
+  btn.setAttribute('aria-expanded', String(open));
+  const body = document.getElementById('fold-body');
+  body.hidden = !open;
+  // the charts grow in each time it opens (hidden charts don't animate, so they start fresh)
+  if (open) body.classList.add('animate');
+  try { localStorage.setItem(FOLD_KEY, open ? 'open' : 'closed'); } catch {}
 }
 
 // The green ticker of what just happened, newest first.
@@ -950,6 +979,8 @@ main.addEventListener('toggle', e => {
 main.addEventListener('click', async e => {
   const rangeBtn = e.target.closest('[data-range]');
   if (rangeBtn) { range = Number(rangeBtn.dataset.range); animateNext = true; render(); return; }
+  const foldBtn = e.target.closest('[data-fold]');
+  if (foldBtn) { toggleFold(foldBtn); return; }
   const open = e.target.closest('[data-open]');
   if (open) {
     openId = Number(open.dataset.open);

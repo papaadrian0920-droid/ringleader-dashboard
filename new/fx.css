@@ -150,3 +150,9 @@
   .range button { padding: 12px 14px; }
   .thread-who .edit { min-height: 36px; padding-inline: 12px; }
 }
+
+/* ---------- Phones: clean and flat, like an app (copied from the Base44 sketch) ---------- */
+@media (max-width: 860px) {
+  /* Today: no 3D radar on a small screen. The money, the jobs and the simple charts say enough. */
+  .hero-viz { display: none; }
+}

@@ -138,7 +138,7 @@
   .inbox.chat-open { grid-template-areas: "thread" "job"; }
   .back { display: inline-flex; align-items: center; gap: 8px; flex-basis: 100%; min-height: 44px; margin: -6px 0 0 -4px; padding: 0 4px; border: 0; background: none; color: var(--hivis); font: 700 1rem var(--f-body); cursor: pointer; }
   /* the texts, the quick replies and the reply box all fit on one screen */
-  .msgs { max-height: max(220px, calc(100dvh - 570px)); }
+  .msgs { max-height: max(150px, calc(100dvh - 570px)); }
   .thread-head { padding: 14px 16px; }
   .thread-who b { font-size: 1.35rem; }
   .thread-head .thread-who { flex: 1 1 calc(100% - 80px); }

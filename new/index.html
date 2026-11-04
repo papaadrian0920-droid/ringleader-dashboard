@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..900&family=IBM+Plex+Mono:wght@500;600&family=Instrument+Sans:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="style.css?v=3">
-  <link rel="stylesheet" href="fx.css?v=16">
+  <link rel="stylesheet" href="fx.css?v=17">
 </head>
 <body>
   <a class="skip" href="#main">Skip to content</a>
@@ -51,14 +51,25 @@
     </header>
 
     <!-- app.js draws the current page in here -->
-    <main class="main" id="main"></main>
+    <main class="main" id="main" aria-busy="true">
+      <!-- What shows for the moment before the numbers arrive. The shapes match the real page. -->
+      <div class="skel" aria-hidden="true">
+        <i class="skel-kicker"></i>
+        <i class="skel-title"></i>
+        <i class="skel-money"></i>
+        <i class="skel-line"></i>
+        <i class="skel-band"></i>
+        <div class="skel-grid"><i></i><i></i><i></i></div>
+        <i class="skel-card"></i>
+      </div>
+    </main>
   </div>
 
   <div class="tip" id="tip" role="tooltip" hidden></div>
   <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
 
   <script src="data.js?v=3"></script>
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
   <script src="fx.js?v=4"></script>
 </body>
 </html>

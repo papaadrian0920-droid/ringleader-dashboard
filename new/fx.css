@@ -99,7 +99,8 @@
 .sys.booked { background: var(--hivis); color: var(--on-hivis); border-color: var(--hivis); font-size: .9rem; padding: 8px 16px; box-shadow: 0 10px 30px -10px var(--hivis-glow); }
 .sys.stop { color: var(--red); border-color: var(--red); }
 .sys.quiet { border-style: dashed; }
-.msg { animation: msg-in .45s var(--ease) both; }
+.animate .msg, .msg.sending { animation: msg-in .45s var(--ease) both; }
+.msg.sending { opacity: .65; } /* on its way to the server */
 @keyframes msg-in { from { opacity: 0; transform: translateY(8px); } }
 .typing { align-self: flex-end; display: flex; align-items: center; gap: 5px; padding: 10px 14px; border-radius: 18px; border: 1px dashed rgba(200, 255, 46, .4); }
 .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--hivis); animation: dot 1.2s infinite; }
@@ -116,7 +117,7 @@
 .ring-mini svg { width: 26px; height: 26px; transform: rotate(-90deg); }
 .ring-mini circle { fill: none; stroke: var(--dim); stroke-width: 4; }
 .ring-mini .fg { stroke: var(--hivis); stroke-linecap: round; filter: drop-shadow(0 0 4px var(--hivis-glow)); }
-@media (prefers-reduced-motion: reduce) { .msg, .typing span { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .animate .msg, .msg.sending, .typing span { animation: none; } }
 /* phones: one column that never grows wider than the screen */
 @media (max-width: 860px) {
   .inbox { grid-template-columns: minmax(0, 1fr); }
@@ -207,3 +208,23 @@
 .fold-body[hidden] { display: none; }
 @media (max-width: 720px) { .fold-btn { padding: 16px 18px; } }
 @media (prefers-reduced-motion: reduce) { .fold-chev { transition: none; } }
+
+/* ---------- Before the numbers arrive: grey shapes where the page will be ---------- */
+.skel { display: grid; gap: 18px; }
+.skel i { display: block; border-radius: 14px; background: linear-gradient(90deg, var(--panel) 25%, var(--panel-2) 50%, var(--panel) 75%) 0 0 / 200% 100%; animation: skel 1.5s linear infinite; }
+@keyframes skel { to { background-position: -200% 0; } }
+.skel-kicker { width: 220px; height: 34px; }
+.skel-title { width: min(420px, 75%); height: 34px; }
+.skel-money { width: min(560px, 90%); height: clamp(72px, 12vw, 130px); }
+.skel-line { width: min(440px, 80%); height: 22px; }
+.skel-band { height: 54px; border-radius: 999px !important; }
+.skel-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.skel-grid i { height: 200px; border-radius: var(--radius); }
+.skel-card { height: 300px; border-radius: var(--radius) !important; }
+@media (prefers-reduced-motion: reduce) { .skel i { animation: none; } }
+
+/* ---------- Toast with an Undo button, and the "can't reach the server" chip ---------- */
+.toast:has(button) { display: flex; align-items: center; gap: 14px; padding-block: 6px; padding-right: 6px; white-space: nowrap; }
+.toast button { min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--on-hivis); color: var(--hivis); font: 700 .95rem var(--f-body); cursor: pointer; }
+.mode.offline { border-color: var(--red); color: var(--red); }
+.mode.offline::before { background: var(--red); }

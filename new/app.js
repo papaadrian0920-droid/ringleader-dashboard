@@ -62,26 +62,68 @@ function greeting() {
 
 // A short message at the bottom of the screen ("Saved", or what went wrong).
 let toastTimer;
-function toast(text, isError) {
+function toast(text, isError, action) {
   const el = document.getElementById('toast');
   el.textContent = text;
+  // An optional button on the toast, like Undo.
+  if (action) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = action.label;
+    button.addEventListener('click', () => { el.hidden = true; action.run(); });
+    el.append(' ', button);
+  }
   el.classList.toggle('error', Boolean(isError));
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
+  toastTimer = setTimeout(() => { el.hidden = true; }, action ? 7000 : 4000);
 }
 
 const arrow = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`;
 
 // ---------- Talking to the server ----------
 
+let lastJson = '';      // what the server last sent, so the page only redraws when something changed
+let everReal = false;  // true once real data has come in, so a dropped connection never turns into example data
+let offline = false;   // true when the server can't be reached and the page shows the last copy it got
+let writes = 0;        // goes up with every change, so an older copy of the data can't overwrite a newer change
+let saving = 0;        // how many changes are still on their way to the server
+
+// Reloading the page shows the last copy straight away, while a fresh one comes in behind it.
+// sessionStorage, not localStorage: customers' texts are gone from this computer when the tab closes.
+const SAVED_COPY = 'rl-last-data';
+function showSavedCopy() {
+  try {
+    const saved = sessionStorage.getItem(SAVED_COPY);
+    if (!saved) return false;
+    data = JSON.parse(saved);
+    mode = data.mode;
+    lastJson = saved;
+    everReal = true;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Gets the latest data. Says whether the page needs redrawing.
 async function load() {
+  const writesAtStart = writes, wasOffline = offline;
   try {
     const res = await fetch('/api/dashboard', { cache: 'no-store' });
     if (!res.ok) throw new Error('No server');
-    data = await res.json();
+    const json = await res.text();
+    const fresh = JSON.parse(json);
+    offline = false;
+    if (writes !== writesAtStart || json === lastJson) return wasOffline;
+    data = fresh;
     mode = data.mode;
+    lastJson = json;
+    everReal = true;
+    try { sessionStorage.setItem(SAVED_COPY, json); } catch {}
+    return true;
   } catch {
+    if (everReal) { offline = true; return !wasOffline; }
     mode = 'example';
     // ?busy on the end of the address shows the two-busy-months example instead of the quiet week
     if (busyDemo) data = window.RL_BUSY;
@@ -90,14 +132,42 @@ async function load() {
       const first = c.messages[0];
       if (first && first.from === 'auto' && !first.text) first.text = autoTextOf(data.autoText.message, data.autoText.contactLine);
     });
+    return true;
   }
 }
 
-async function api(path, body, method = 'POST') {
-  const res = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+async function api(path, body, method = 'POST', headers = {}) {
+  let res;
+  try {
+    res = await fetch(path, { method, headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body || {}) });
+  } catch {
+    throw new Error("Can't reach the server. Check your connection and try again.");
+  }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || 'Something went wrong. Is the server running?');
   return json;
+}
+
+// Changes the screen right away, then tells the server in the background.
+// change() makes the change and gives back a function that takes it back, for when the server says no.
+async function saveInBackground(change, path, body, headers) {
+  const takeBack = change();
+  render();
+  if (mode === 'example') return true;
+  saving++;
+  writes++;
+  try {
+    await api(path, body, 'POST', headers);
+    return true;
+  } catch (err) {
+    takeBack();
+    render();
+    toast(err.message, true);
+    return false;
+  } finally {
+    // Once everything has landed, the server's copy replaces our guess.
+    if (--saving === 0) { lastJson = ''; await refresh(); }
+  }
 }
 
 // ---------- Numbers (all worked out from the conversations, so they always add up) ----------
@@ -599,6 +669,7 @@ function shortTag(x) {
 
 function messageLabel(m, c) {
   const base = { auto: 'Auto-text', followup: 'Follow-up', assistant: 'AI assistant', owner: 'You', customer: who(c) }[m.from] || m.from;
+  if (m.status === 'sending') return base + ' · sending…';
   return m.status === 'failed' || m.status === 'undelivered' ? base + ' · not delivered' : base;
 }
 
@@ -619,7 +690,7 @@ function threadHtml(c) {
       </div>
       <div class="msgs" id="msgs">
         <p class="sys missed"><i aria-hidden="true"></i>Missed call · ${dayName(c.daysAgo)} ${esc(c.time)}</p>
-        ${c.messages.map(m => `<div class="msg ${m.from}${m.status === 'failed' || m.status === 'undelivered' ? ' failed' : ''}"><p>${esc(m.text)}</p><small>${esc(messageLabel(m, c))}</small></div>`).join('')}
+        ${c.messages.map(m => `<div class="msg ${m.from}${m.status === 'failed' || m.status === 'undelivered' ? ' failed' : ''}${m.status === 'sending' ? ' sending' : ''}"><p>${esc(m.text)}</p><small>${esc(messageLabel(m, c))}</small></div>`).join('')}
         ${{
           booked: `<p class="sys booked">Booked · ${money(c.value)}</p>`,
           'opted-out': '<p class="sys stop">Texted STOP. No more texts go to this number.</p>',
@@ -898,14 +969,24 @@ function render() {
   const animate = animateNext;
   animateNext = false;
   main.className = 'main' + (animate ? ' animate' : '');
+  // Redrawing must not lose what the owner was typing in this conversation.
+  const owner = box => box.form.dataset.reply || box.form.dataset.book || box.form.dataset.name;
+  const typed = [...main.querySelectorAll('#reply-box, #job-value, #name-box')].map(box => ({ box, id: box.id, from: owner(box), value: box.value, focused: document.activeElement === box, at: box.selectionStart }));
   main.innerHTML = PAGES[page]();
+  main.removeAttribute('aria-busy');
+  for (const old of typed) {
+    const box = document.getElementById(old.id);
+    if (!box || owner(box) !== old.from) continue;
+    box.value = old.value;
+    if (old.focused) { box.focus(); box.setSelectionRange(old.at, old.at); }
+  }
   document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page || (page === 'crew' && a.dataset.page === 'frontdesk')));
   document.getElementById('biz-name').textContent = data.business.name;
   document.getElementById('waiting-count').textContent = stats().waiting || '';
   const chip = document.getElementById('side-foot');
-  chip.className = 'mode ' + mode;
-  chip.textContent = mode === 'live' ? 'Live' : mode === 'test' ? 'Test mode' : 'Example data';
-  chip.title = mode === 'live' ? 'Texts send from ' + data.business.ringleaderNumber : mode === 'test' ? 'No real texts are sent' : 'Start the server to see real calls';
+  chip.className = 'mode ' + (offline ? 'offline' : mode);
+  chip.textContent = offline ? 'Offline' : mode === 'live' ? 'Live' : mode === 'test' ? 'Test mode' : 'Example data';
+  chip.title = offline ? "Can't reach the server. This is the last copy it sent." : mode === 'live' ? 'Texts send from ' + data.business.ringleaderNumber : mode === 'test' ? 'No real texts are sent' : 'Start the server to see real calls';
   if (page === 'autotext') updateAutotext();
   const msgs = document.getElementById('msgs');
   if (msgs) msgs.scrollTop = msgs.scrollHeight;
@@ -930,8 +1011,7 @@ function countUp() {
 }
 
 async function refresh() {
-  await load();
-  render();
+  if (await load()) render();
 }
 
 window.addEventListener('hashchange', () => {
@@ -960,13 +1040,17 @@ document.querySelector('.nav').addEventListener('click', e => {
 });
 
 // Check for new texts every 15 seconds, unless you're in the middle of typing.
-setInterval(() => {
-  if (mode === 'example' || document.hidden) return;
+// Also right away when the owner comes back to the app, or the connection comes back.
+function quietRefresh() {
+  if (mode === 'example' || document.hidden || saving) return;
   const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
   if (typing || currentPage() === 'autotext') return;
   const y = window.scrollY;
   refresh().then(() => window.scrollTo(0, y));
-}, 15000);
+}
+setInterval(quietRefresh, 15000);
+document.addEventListener('visibilitychange', quietRefresh);
+window.addEventListener('online', quietRefresh);
 
 // ---------- Chart hover labels ----------
 
@@ -1115,69 +1199,78 @@ main.addEventListener('submit', async e => {
   }
 });
 
+// The key the server uses to spot a repeat. Trying the same words again after a failure keeps
+// the key, so if the first try actually got through, the customer still gets one text.
+let lastTry = null;
 async function sendReply(form) {
   const box = form.querySelector('input');
   const text = box.value.trim();
   if (!text) return;
   const id = Number(form.dataset.reply);
-  if (mode === 'example') {
-    const c = data.conversations.find(x => x.id === id);
-    c.messages.push({ from: 'owner', text });
+  const c = data.conversations.find(x => x.id === id);
+  if (lastTry?.id !== id || lastTry.text !== text) lastTry = { id, text, key: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}` };
+  const thisTry = lastTry;
+  box.value = '';
+  const sent = saveInBackground(() => {
+    const before = c.status;
+    const message = { from: 'owner', text, status: mode === 'example' ? undefined : 'sending' };
+    c.messages.push(message);
     if (c.status !== 'booked') c.status = 'replied';
-    render();
-  } else {
-    await api(`/api/conversations/${id}/reply`, { text });
-    await refresh();
-  }
+    return () => { c.messages.splice(c.messages.indexOf(message), 1); c.status = before; };
+  }, `/api/conversations/${id}/reply`, { text }, { 'Idempotency-Key': thisTry.key });
   document.getElementById('reply-box')?.focus();
+  if (await sent) {
+    if (lastTry === thisTry) lastTry = null;
+    return;
+  }
+  // It didn't go. Put the words back so they aren't lost.
+  const again = document.getElementById('reply-box');
+  if (again && Number(again.form.dataset.reply) === id && !again.value) again.value = text;
 }
 
 async function markBooked(form) {
   const value = form.querySelector('input').value;
   const id = Number(form.dataset.book);
-  if (mode === 'example') {
-    const c = data.conversations.find(x => x.id === id);
+  const c = data.conversations.find(x => x.id === id);
+  const saved = saveInBackground(() => {
+    const before = { status: c.status, value: c.value };
     c.status = 'booked';
-    c.value = Number(value.replace(/[^0-9.]/g, '')) || 0;
-    render();
-  } else {
-    await api(`/api/conversations/${id}/book`, { value });
-    await refresh();
-  }
-  toast('Marked as booked.');
+    c.value = Math.max(0, Math.round(Number(value.replace(/[^0-9.]/g, '')) || 0));
+    return () => Object.assign(c, before);
+  }, `/api/conversations/${id}/book`, { value });
+  toast('Marked as booked.', false, { label: 'Undo', run: () => undoBooked(id) });
+  await saved;
 }
 
 async function undoBooked(id) {
-  try {
-    if (mode === 'example') {
-      const c = data.conversations.find(x => x.id === id);
-      c.status = c.details?.done && !c.details.timingAsked ? 'ready' : 'waiting';
-      c.value = 0;
-      render();
-    } else {
-      await api(`/api/conversations/${id}/unbook`, {});
-      await refresh();
-    }
-    toast('Undone. It is not booked anymore.');
-  } catch (err) {
-    toast(err.message, true);
-  }
+  const c = data.conversations.find(x => x.id === id);
+  const saved = saveInBackground(() => {
+    const before = { status: c.status, value: c.value };
+    // the same rule the server uses
+    c.status = c.messages.some(m => m.from === 'owner') ? 'replied'
+      : c.details?.done && !c.details.timingAsked ? 'ready'
+      : c.messages.some(m => m.from === 'customer') ? 'waiting' : 'no-reply';
+    c.value = 0;
+    return () => Object.assign(c, before);
+  }, `/api/conversations/${id}/unbook`);
+  toast('Undone. It is not booked anymore.');
+  await saved;
 }
 
 async function saveName(form) {
   const name = form.querySelector('input').value.trim();
   if (!name) return;
   const id = Number(form.dataset.name);
+  const c = data.conversations.find(x => x.id === id);
   editingName = false;
-  if (mode === 'example') {
-    data.conversations.find(x => x.id === id).name = name;
-    render();
-  } else {
-    await api(`/api/conversations/${id}/name`, { name });
-    await refresh();
-  }
+  await saveInBackground(() => {
+    const before = c.name;
+    c.name = name;
+    return () => { c.name = before; };
+  }, `/api/conversations/${id}/name`, { name });
 }
 
+if (showSavedCopy()) render();
 refresh();
 
 // Typing in the search box redraws just the list, so the box keeps your cursor.

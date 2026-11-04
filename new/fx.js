@@ -227,6 +227,53 @@
     });
   }
 
+  // ---------- Phones: swipe an open chat to the right to go back ----------
+  // The chat follows your finger with the list showing underneath, so you can see where you're going.
+  // Let go past a third of the way (or flick) and it's gone. Otherwise it slides back, and you can grab it again on the way.
+  let swipe = null, settleTimer;
+  const chatParts = inbox => inbox.querySelector('.thread');
+  function settle(inbox, to, then) {
+    inbox.classList.add('settling');
+    inbox.style.setProperty('--swipe', to + 'px');
+    inbox.style.setProperty('--swipe-p', to ? 1 : 0);
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => { inbox.classList.remove('settling'); then(); }, 240);
+  }
+  main.addEventListener('pointerdown', e => {
+    const inbox = e.target.closest('.inbox.chat-open');
+    // the first bit of the screen edge belongs to the phone's own back swipe
+    if (!inbox || e.pointerType !== 'touch' || !isPhone() || e.clientX < 24 || e.target.closest('.quick, input, textarea, a')) return;
+    swipe = { inbox, id: e.pointerId, x: e.clientX, y: e.clientY, at: e.timeStamp, from: 0, dragging: false };
+  });
+  addEventListener('pointermove', e => {
+    if (!swipe || e.pointerId !== swipe.id) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    if (!swipe.dragging) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { swipe = null; return; } // that's a scroll
+      if (dx < 10 || dx < Math.abs(dy) * 1.5) return;
+      if (!swipe.inbox.isConnected) { swipe = null; return; }
+      clearTimeout(settleTimer);
+      swipe.from = new DOMMatrix(getComputedStyle(chatParts(swipe.inbox)).transform).m41; // grabbed mid-slide: carry on from there
+      swipe.inbox.classList.remove('settling');
+      swipe.inbox.classList.add('swiping');
+      swipe.dragging = true;
+    }
+    const moved = Math.max(0, swipe.from + dx);
+    swipe.inbox.style.setProperty('--swipe', moved + 'px');
+    swipe.inbox.style.setProperty('--swipe-p', Math.min(1, moved / innerWidth));
+  });
+  function endSwipe(e) {
+    if (!swipe || e.pointerId !== swipe.id) return;
+    const { inbox, dragging, x, at, from } = swipe;
+    swipe = null;
+    if (!dragging) return;
+    const dx = from + e.clientX - x, flick = (e.clientX - x) / Math.max(1, e.timeStamp - at) > 0.5 && dx > 40;
+    if (e.type === 'pointerup' && (dx > innerWidth / 3 || flick)) settle(inbox, innerWidth, () => closeChat({ slid: true }));
+    else settle(inbox, 0, () => inbox.classList.remove('swiping'));
+  }
+  addEventListener('pointerup', endSwipe);
+  addEventListener('pointercancel', endSwipe);
+
   // ---------- after every page draw ----------
   addEventListener('rl:render', e => {
     moveBlob();

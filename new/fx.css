@@ -228,3 +228,39 @@
 .toast button { min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--on-hivis); color: var(--hivis); font: 700 .95rem var(--f-body); cursor: pointer; }
 .mode.offline { border-color: var(--red); color: var(--red); }
 .mode.offline::before { background: var(--red); }
+
+/* ---------- Moving between screens (app.js picks the kind in data-slide) ---------- */
+html[data-slide] .main { view-transition-name: page; }
+html[data-slide] .bar { view-transition-name: bar; }
+html[data-slide] .nav { view-transition-name: nav; }
+::view-transition { pointer-events: none; } /* taps go straight through, so nothing has to finish first */
+::view-transition-group(*) { animation: none; }
+/* the top bar and menu stay live, so the menu highlight keeps sliding */
+::view-transition-old(root), ::view-transition-old(bar), ::view-transition-old(nav) { display: none; }
+::view-transition-new(root), ::view-transition-new(bar), ::view-transition-new(nav) { animation: none; opacity: 1; }
+::view-transition-old(page), ::view-transition-new(page) { mix-blend-mode: normal; }
+/* a change of page: the old one fades, the new one brings its own entrance */
+::view-transition-old(page) { translate: 0 var(--was-at, 0); animation: vt-fade .14s ease-out both; }
+::view-transition-new(page) { animation: none; opacity: 1; }
+@keyframes vt-fade { to { opacity: 0; } }
+/* opening a chat on a phone: it comes in from the right */
+html[data-slide="forward"]::view-transition-old(page) { animation: vt-push-away .28s var(--ease) both; }
+html[data-slide="forward"]::view-transition-new(page) { animation: vt-in-right .28s var(--ease) both; }
+@keyframes vt-push-away { to { translate: -25% var(--was-at, 0); opacity: 0; } }
+@keyframes vt-in-right { from { translate: 100% 0; } }
+/* going back: the chat leaves to the right */
+html[data-slide="back"]::view-transition-old(page) { z-index: 1; animation: vt-out-right .24s var(--ease) both; }
+html[data-slide="back"]::view-transition-new(page) { animation: vt-in-left .24s var(--ease) both; }
+@keyframes vt-out-right { to { translate: 100% var(--was-at, 0); } }
+@keyframes vt-in-left { from { translate: -25% 0; opacity: 0; } }
+
+/* ---------- Phones: swiping a chat away (fx.js moves it) ---------- */
+@media (max-width: 860px) {
+  .inbox.chat-open { position: relative; touch-action: pan-y; }
+  .quick { touch-action: pan-x; }
+  .main:has(.inbox.swiping) { overflow-x: clip; } /* the chat sliding off the side can't make the page scroll sideways */
+  .inbox.swiping { user-select: none; -webkit-user-select: none; }
+  .inbox.swiping > .thread, .inbox.swiping > .job-panel { position: relative; z-index: 1; transform: translateX(var(--swipe, 0)); }
+  .inbox.swiping > .inbox-side { display: grid; position: absolute; inset: 0 0 auto; opacity: calc(.35 + .65 * var(--swipe-p, 0)); transform: translateX(calc(-8% + 8% * var(--swipe-p, 0))); }
+  .inbox.settling > .thread, .inbox.settling > .job-panel, .inbox.settling > .inbox-side { transition: transform .22s var(--ease), opacity .22s; }
+}

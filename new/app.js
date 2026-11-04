@@ -1014,22 +1014,45 @@ async function refresh() {
   if (await load()) render();
 }
 
+// Moves from one screen to the next instead of jumping: 'page' fades, 'forward' and 'back' slide.
+// Browsers that can't do it, and people who turned motion off, just get the new screen.
+let lastTransition;
+function transition(kind, draw) {
+  const root = document.documentElement;
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) { draw(); return; }
+  root.dataset.slide = kind;
+  const was = main.getBoundingClientRect().top;
+  const moving = document.startViewTransition(() => {
+    draw();
+    root.style.setProperty('--was-at', `${was - main.getBoundingClientRect().top}px`); // keeps the old screen where you had scrolled it
+  });
+  lastTransition = moving;
+  moving.ready.catch(() => {}); // cut short by the next one: the new screen is still drawn
+  moving.finished.catch(() => {}).finally(() => { if (lastTransition === moving) delete root.dataset.slide; });
+}
+const redrawAtTop = () => { render(); window.scrollTo(0, 0); };
+
 window.addEventListener('hashchange', () => {
   if (currentPage() !== 'conversations') chatOpen = chatInHistory = false;
-  animateNext = true; render(); window.scrollTo(0, 0);
+  const intoChat = chatOpen && isPhone();
+  animateNext = !intoChat;
+  transition(intoChat ? 'forward' : 'page', redrawAtTop);
 });
 
 // Phones: close the open chat and show the list again.
-function closeChat() {
-  if (chatInHistory) { history.back(); return; } // the popstate below does the rest
-  chatOpen = false;
-  render(); window.scrollTo(0, 0);
+// slid: the finger already moved it off screen, so no second animation.
+function closeChat({ slid = false } = {}) {
+  const inHistory = chatInHistory;
+  chatOpen = chatInHistory = false;
+  if (slid) redrawAtTop(); else transition('back', redrawAtTop);
+  if (inHistory) history.back(); // takes the chat's step off the Back button's list
 }
 // The phone's Back button (or swipe back) closes an open chat instead of leaving the page.
-window.addEventListener('popstate', () => {
+window.addEventListener('popstate', e => {
   if (!chatInHistory) return;
   chatOpen = chatInHistory = false;
-  render(); window.scrollTo(0, 0);
+  // Phones that animate their own back swipe don't need ours on top.
+  if (e.hasUAVisualTransition) redrawAtTop(); else transition('back', redrawAtTop);
 });
 // Tapping "Texts" in the menu while a chat is open goes back to the list.
 document.querySelector('.nav').addEventListener('click', e => {
@@ -1084,8 +1107,7 @@ main.addEventListener('click', async e => {
     if (location.hash === '#conversations') {
       e.preventDefault();
       if (isPhone() && !chatInHistory) { history.pushState({ chat: true }, ''); chatInHistory = true; }
-      render();
-      if (isPhone()) window.scrollTo(0, 0);
+      if (isPhone()) transition('forward', redrawAtTop); else render();
     }
     return;
   }

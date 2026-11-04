@@ -588,6 +588,7 @@ let editingName = false;
 // On phones the list and the open conversation are two screens, like a texting app.
 let chatOpen = false;
 let chatInHistory = false; // true when the phone's Back button should close the chat
+let jobOpen = false; // job details start closed, so the chat gets the room
 const isPhone = () => matchMedia('(max-width: 860px)').matches;
 
 const FILTERS = [
@@ -629,15 +630,14 @@ function conversationsPage() {
   const c = data.conversations.find(x => x.id === openId);
 
   return `
-    <header class="page-top${chatOpen ? ' chat-open' : ''}">
-      <h1 class="page-title">Texts<span class="hi">.</span></h1>
-      <div class="tabs" role="group" aria-label="Filter conversations">
-        ${FILTERS.map(([key, label, fn]) => `<button type="button" data-filter="${key}" aria-pressed="${filter === key}">${label}<span class="n">${data.conversations.filter(fn).length}</span></button>`).join('')}
-      </div>
-    </header>
-
-    <section class="inbox${chatOpen ? ' chat-open' : ''}">
+    <section class="inbox${chatOpen ? ' chat-open' : ''}${jobOpen && c ? ' job-open' : ''}">
       <div class="inbox-side">
+        <div class="side-top">
+          <h1 class="page-title">Texts<span class="hi">.</span></h1>
+          <div class="tabs" role="group" aria-label="Filter conversations">
+            ${FILTERS.map(([key, label, fn]) => `<button type="button" data-filter="${key}" aria-pressed="${filter === key}">${label}<span class="n">${data.conversations.filter(fn).length}</span></button>`).join('')}
+          </div>
+        </div>
         <label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span hidden>Search</span><input id="search" type="search" placeholder="Search names, numbers, texts" value="${esc(search)}" autocomplete="off"><kbd class="key-hint" aria-hidden="true">/</kbd></label>
         <div class="inbox-list">${listHtml(list)}</div>
       </div>
@@ -651,19 +651,18 @@ function listItem(x) {
   const line = x.summary && x.status !== 'no-reply' ? x.summary : lastText(x);
   const progress = x.status === 'gathering' ? ` ${detailsIn(x)}/${checklist().length}` : '';
   return `
-    <button type="button" data-open="${x.id}" class="${x.id === openId ? 'active' : ''} ${x.status}">
+    <button type="button" data-open="${x.id}" title="${esc(who(x))}" class="${x.id === openId ? 'active' : ''} ${x.status}">
       <span class="av ${x.status}" aria-hidden="true">${esc(initials(x))}</span>
       <span class="top"><b>${esc(who(x))}</b><time>${dayName(x.daysAgo)}</time></span>
       <span class="preview">${esc(line)}</span>
-      <span class="pills"><span class="pill ${x.status}">${STATUS[x.status]}${progress}${x.status === 'booked' ? ' ' + money(x.value) : ''}</span>${x.details?.timingAsked && x.status !== 'booked' ? '<span class="pill timing">Asked timing</span>' : ''}</span>
-      ${shortTag(x)}
+      ${shortTag(x, progress)}
     </button>`;
 }
 
-// Phones only have room for a short tag on the right (or none, when there's nothing to do yet).
-function shortTag(x) {
+// A short tag on the right of each row (or none, when there's nothing to do yet).
+function shortTag(x, progress = '') {
   if (x.status === 'booked') return `<span class="tag booked">${money(x.value)}</span>`;
-  const tag = { waiting: 'Needs you', ready: 'Ready', gathering: 'AI asking', 'opted-out': 'STOP' }[x.status];
+  const tag = { waiting: 'Needs you', ready: 'Ready', gathering: 'AI' + progress, 'opted-out': 'STOP' }[x.status];
   return tag ? `<span class="tag ${x.status}">${tag}</span>` : '';
 }
 
@@ -673,21 +672,22 @@ function messageLabel(m, c) {
   return m.status === 'failed' || m.status === 'undelivered' ? base + ' · not delivered' : base;
 }
 
+const icon = path => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`;
+
 function threadHtml(c) {
-  const nameForm = `<form class="name-form" data-name="${c.id}"><label for="name-box" hidden>Customer name</label><input id="name-box" placeholder="Their name" maxlength="60" autocomplete="off" value="${esc(c.name || '')}"><button class="btn" type="submit">Save</button></form>`;
   return `
     <div class="thread">
       <div class="thread-head">
-        <button type="button" class="back" data-back><span aria-hidden="true">←</span> All texts</button>
+        <button type="button" class="back" data-back aria-label="All texts">${icon('<path d="M15 5l-7 7 7 7"/>')}<span>All texts</span></button>
         <span class="av big ${c.status}" aria-hidden="true">${esc(initials(c))}</span>
         <div class="thread-who">
-          ${c.name && !editingName
-            ? `<span class="name-row"><b>${esc(c.name)}</b><button type="button" class="edit" data-edit-name aria-label="Edit name">Edit</button></span>`
-            : nameForm}
-          <span class="thread-phone">#${esc(c.id)} · ${esc(c.phone)} · ${dayName(c.daysAgo)} ${esc(c.time)}</span>
+          <span class="name-row"><b>${esc(who(c))}</b><button type="button" class="edit" data-edit-name>${c.name ? 'Edit' : 'Add name'}</button></span>
+          <span class="thread-phone">#${esc(c.id)}${c.name ? ' · ' + esc(c.phone) : ''}<span class="thread-when"> · ${dayName(c.daysAgo)} ${esc(c.time)}</span></span>
         </div>
-        <span class="pill ${c.status}">${STATUS[c.status]}</span>
+        <a class="head-btn" href="${telLink(c)}" aria-label="Call ${esc(who(c))}">${icon('<path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/>')}<span>Call</span></a>
+        <button type="button" class="head-btn" data-job-toggle aria-expanded="${jobOpen}" aria-controls="job-panel" aria-label="Job details">${icon('<path d="M4 6h16M4 12h16M4 18h10"/>')}<span>Job details</span>${c.details ? `<small>${detailsIn(c)}/${checklist().length}</small>` : ''}</button>
       </div>
+      ${nextStep(c)}
       <div class="msgs" id="msgs">
         <p class="sys missed"><i aria-hidden="true"></i>Missed call · ${dayName(c.daysAgo)} ${esc(c.time)}</p>
         ${c.messages.map(m => `<div class="msg ${m.from}${m.status === 'failed' || m.status === 'undelivered' ? ' failed' : ''}${m.status === 'sending' ? ' sending' : ''}"><p>${esc(m.text)}</p><small>${esc(messageLabel(m, c))}</small></div>`).join('')}
@@ -707,16 +707,13 @@ function threadHtml(c) {
     </div>`;
 }
 
-// The right side: where this job stands, what to do next, and everything the AI found out.
-function jobPanel(c) {
-  const d = c.details;
-  const total = checklist().length;
-  const got = detailsIn(c);
-  const unsure = d ? checklist().filter(i => d.items[i.key] === 'not sure') : [];
+// The bar above the texts: where this job stands, what to do next, and booking it.
+function nextStep(c) {
+  const got = detailsIn(c), total = checklist().length;
   const state = {
     booked: ['Booked', `A ${money(c.value)} job. Clicked it by mistake? Undo puts it back.`],
     ready: ['Ready to book', `Every detail is in. Text or call ${esc(firstName(c))} to set a time.`],
-    waiting: d?.timingAsked
+    waiting: c.details?.timingAsked
       ? ['Waiting on you', `${esc(firstName(c))} asked when someone can come. Text them a time.`]
       : ['Waiting on you', `${esc(firstName(c))} texted and is waiting for your answer.`],
     gathering: ['AI is asking', `${got} of ${total} details in. It keeps going until it has every one.`],
@@ -724,42 +721,71 @@ function jobPanel(c) {
     'no-reply': ['No reply yet', "They got the auto-text but haven't written back."],
     'opted-out': ['Texted STOP', "They opted out, so you can't text them anymore."]
   }[c.status] || [STATUS[c.status] || c.status, ''];
-
   return `
-    <aside class="job-panel" aria-label="Job">
-      <div class="state ${c.status}">
+    <div class="state ${c.status}">
+      <div class="state-words">
         <span class="state-label">${state[0]}${c.status === 'booked' ? ' ' + money(c.value) : ''}</span>
         <p>${state[1]}</p>
-        ${c.status === 'gathering' ? `<span class="meter" aria-hidden="true"><i style="width: ${Math.round(got / total * 100)}%"></i></span>` : ''}
       </div>
-
-      <div class="actions">
-        <a class="btn" href="${telLink(c)}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg>Call</a>
-        <button type="button" class="btn" data-focus-reply><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Text</button>
-      </div>
+      ${c.status === 'gathering' ? `<span class="meter" aria-hidden="true"><i style="width: ${Math.round(got / total * 100)}%"></i></span>` : ''}
       ${c.status === 'booked'
-        ? `<button type="button" class="btn undo" data-unbook="${c.id}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Undo booked</button>`
+        ? `<button type="button" class="btn undo" data-unbook="${c.id}">${icon('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>')}Undo booked</button>`
         : `<form class="book-form" data-book="${c.id}">
              <label for="job-value" hidden>Job value</label>
              <input id="job-value" inputmode="numeric" placeholder="Job $" aria-label="Job value in dollars">
              <button class="btn btn-main" type="submit">Mark booked</button>
            </form>`}
+    </div>`;
+}
 
-      ${d ? `
-        <div class="checklist">
-          <h3>Job details <span class="ring-mini"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" pathLength="100" stroke-dasharray="${Math.round(got / total * 100)} 100"/></svg>${got}/${total}</span></h3>
-          ${d.done && unsure.length ? `<p class="unsure-note">Not sure about ${unsure.map(i => i.label.toLowerCase()).join(', ')}. Ask when you call.</p>` : ''}
-          <ul>
-            ${checklist().map(i => {
-              const v = d.items[i.key];
-              const kind = !v ? 'todo' : v === 'not sure' ? 'unsure' : 'got';
-              const shown = kind === 'got' ? esc(v) : kind === 'unsure' ? 'Not sure' : c.status === 'gathering' ? 'Still asking…' : 'Not given';
-              return `<li class="${kind}"><span class="tick" aria-hidden="true"></span><span class="lbl">${esc(i.label)}</span><b>${shown}</b></li>`;
-            }).join('')}
-          </ul>
-        </div>`
-      : c.summary ? `<div class="checklist"><h3>Job details</h3><p class="plain-summary">${esc(c.summary)}</p></div>` : ''}
+// Job details stay out of the way until you ask for them: a side panel on computers, a sheet on phones.
+function jobPanel(c) {
+  const d = c.details;
+  const total = checklist().length;
+  const got = detailsIn(c);
+  const unsure = d ? checklist().filter(i => d.items[i.key] === 'not sure') : [];
+  const nameForm = `<form class="name-form" data-name="${c.id}"><label for="name-box" hidden>Customer name</label><input id="name-box" placeholder="Their name" maxlength="60" autocomplete="off" value="${esc(c.name || '')}"><button class="btn" type="submit">Save</button></form>`;
+
+  return `
+    <aside class="job-panel" id="job-panel" aria-label="Job details">
+      <div class="job-panel-in">
+        <div class="job-panel-head">
+          <h2>Job details</h2>
+          <button type="button" class="head-btn" data-job-toggle aria-label="Close job details">${icon('<path d="M6 6l12 12M18 6L6 18"/>')}</button>
+        </div>
+        <div class="cust-card">
+          ${c.name && !editingName
+            ? `<span class="name-row"><b>${esc(c.name)}</b><button type="button" class="edit" data-edit-name>Edit</button></span>`
+            : nameForm}
+          <span class="thread-phone">${esc(c.phone)}</span>
+        </div>
+        ${d ? `
+          <div class="checklist">
+            <h3>What the AI found out <span class="ring-mini"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15"/><circle class="fg" cx="18" cy="18" r="15" pathLength="100" stroke-dasharray="${Math.round(got / total * 100)} 100"/></svg>${got}/${total}</span></h3>
+            ${d.done && unsure.length ? `<p class="unsure-note">Not sure about ${unsure.map(i => i.label.toLowerCase()).join(', ')}. Ask when you call.</p>` : ''}
+            <ul>
+              ${checklist().map(i => {
+                const v = d.items[i.key];
+                const kind = !v ? 'todo' : v === 'not sure' ? 'unsure' : 'got';
+                const shown = kind === 'got' ? esc(v) : kind === 'unsure' ? 'Not sure' : c.status === 'gathering' ? 'Still asking…' : 'Not given';
+                return `<li class="${kind}"><span class="tick" aria-hidden="true"></span><span class="lbl">${esc(i.label)}</span><b>${shown}</b></li>`;
+              }).join('')}
+            </ul>
+          </div>`
+        : c.summary ? `<div class="checklist"><h3>Job details</h3><p class="plain-summary">${esc(c.summary)}</p></div>`
+        : '<p class="empty">No job details yet. The AI asks for them once they text back.</p>'}
+      </div>
     </aside>`;
+}
+
+// Opens or closes job details without redrawing the page, so the panel can slide.
+function setJobOpen(open) {
+  jobOpen = open;
+  main.querySelector('.inbox')?.classList.toggle('job-open', open);
+  const toggle = main.querySelector('.thread-head [data-job-toggle]');
+  toggle?.setAttribute('aria-expanded', String(open));
+  if (open) main.querySelector('.job-panel-head [data-job-toggle]')?.focus({ preventScroll: true });
+  else if (main.querySelector('.job-panel')?.contains(document.activeElement)) toggle?.focus({ preventScroll: true });
 }
 
 // ---------- Page: Settings ----------
@@ -972,8 +998,14 @@ function render() {
   // Redrawing must not lose what the owner was typing in this conversation.
   const owner = box => box.form.dataset.reply || box.form.dataset.book || box.form.dataset.name;
   const typed = [...main.querySelectorAll('#reply-box, #job-value, #name-box')].map(box => ({ box, id: box.id, from: owner(box), value: box.value, focused: document.activeElement === box, at: box.selectionStart }));
+  const listWas = main.querySelector('.inbox-list');
+  const listTop = listWas ? listWas.scrollTop : null;
   main.innerHTML = PAGES[page]();
   main.removeAttribute('aria-busy');
+  // The list stays where you scrolled it. Arriving from another page, it shows who's open.
+  const listNow = main.querySelector('.inbox-list');
+  if (listNow && listTop !== null) listNow.scrollTop = listTop;
+  else if (listNow) listNow.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
   for (const old of typed) {
     const box = document.getElementById(old.id);
     if (!box || owner(box) !== old.from) continue;
@@ -1022,11 +1054,15 @@ function transition(kind, draw) {
   if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) { draw(); return; }
   root.dataset.slide = kind;
   const was = main.getBoundingClientRect().top;
+  let drawn = false;
   const moving = document.startViewTransition(() => {
+    drawn = true;
     draw();
     root.style.setProperty('--was-at', `${was - main.getBoundingClientRect().top}px`); // keeps the old screen where you had scrolled it
   });
   lastTransition = moving;
+  // If the browser isn't painting (say the window is covered), don't wait for it: draw the new screen anyway.
+  setTimeout(() => { if (!drawn) moving.skipTransition(); }, 200);
   moving.ready.catch(() => {}); // cut short by the next one: the new screen is still drawn
   moving.finished.catch(() => {}).finally(() => { if (lastTransition === moving) delete root.dataset.slide; });
 }
@@ -1044,7 +1080,7 @@ let backPending = false; // history.back() takes a moment; the list doesn't wait
 // slid: the finger already moved it off screen, so no second animation.
 function closeChat({ slid = false } = {}) {
   const inHistory = chatInHistory;
-  chatOpen = chatInHistory = false;
+  chatOpen = chatInHistory = jobOpen = false;
   if (slid) redrawAtTop(); else transition('back', redrawAtTop);
   if (inHistory) { backPending = true; history.back(); } // takes the chat's step off the Back button's list
 }
@@ -1057,7 +1093,7 @@ window.addEventListener('popstate', e => {
     return;
   }
   if (!chatInHistory) return;
-  chatOpen = chatInHistory = false;
+  chatOpen = chatInHistory = jobOpen = false;
   // Phones that animate their own back swipe don't need ours on top.
   if (e.hasUAVisualTransition) redrawAtTop(); else transition('back', redrawAtTop);
 });
@@ -1119,13 +1155,16 @@ main.addEventListener('click', async e => {
     return;
   }
   if (e.target.closest('[data-back]')) { closeChat(); return; }
+  if (e.target.closest('[data-job-toggle]')) { setJobOpen(!jobOpen); return; }
+  // Phones: tapping the dark area behind the job details sheet closes it.
+  if (e.target.classList.contains('inbox') && jobOpen && isPhone()) { setJobOpen(false); return; }
   if (e.target.closest('[data-edit-name]')) {
     editingName = true;
+    jobOpen = true; // the name is edited in job details
     render();
     document.getElementById('name-box')?.focus();
     return;
   }
-  if (e.target.closest('[data-focus-reply]')) { document.getElementById('reply-box')?.focus(); return; }
   const quick = e.target.closest('[data-quick]');
   if (quick) {
     const box = document.getElementById('reply-box');
@@ -1307,7 +1346,9 @@ let menu = null, menuRows = [], menuPick = 0;
 
 function goToChat(id) {
   filter = 'all'; search = ''; openId = id; editingName = false; chatOpen = true;
-  if (currentPage() === 'conversations') render(); else location.hash = 'conversations';
+  if (currentPage() !== 'conversations') { location.hash = 'conversations'; return; }
+  render();
+  main.querySelector('.inbox-list .active')?.scrollIntoView({ block: 'nearest' });
 }
 function goToRange(days) {
   range = days;
@@ -1385,6 +1426,7 @@ document.addEventListener('keydown', e => {
     if (menu?.open) menu.close(); else openMenu();
     return;
   }
+  if (e.key === 'Escape' && jobOpen && !menu?.open && currentPage() === 'conversations') { setJobOpen(false); return; }
   // The single keys only work when you aren't typing in something.
   if (e.metaKey || e.ctrlKey || e.altKey || menu?.open) return;
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;

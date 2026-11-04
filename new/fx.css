@@ -69,16 +69,10 @@
 @media (max-width: 860px) { .hero-money { font-size: min(9.5rem, 21cqi); } }
 
 /* ---------- Texts: search, day groups, avatars ---------- */
-.inbox-side { grid-area: list; display: grid; gap: 10px; align-content: start; min-width: 0; }
-.inbox-side .inbox-list { grid-area: auto; grid-row: auto; }
-@media (max-width: 1360px) { .inbox-side { grid-row: 1 / span 2; } .inbox-side .inbox-list { max-height: 78vh; } }
-@media (max-width: 860px) { .inbox-side { grid-row: auto; } .inbox-side .inbox-list { max-height: 320px; } }
 .search { display: flex; align-items: center; gap: 10px; padding: 0 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); color: var(--soft); transition: border-color .2s, box-shadow .2s; }
 .search:focus-within { border-color: var(--hivis); box-shadow: 0 0 0 4px rgba(200, 255, 46, .12); }
 .search input { border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 12px 0 !important; }
 .inbox-list .group { font-family: var(--f-mono); font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--mid); padding: 10px 6px 2px; position: sticky; top: 0; z-index: 1; background: linear-gradient(var(--bg) 70%, transparent); }
-.inbox-list button { grid-template-columns: 42px minmax(0, 1fr); column-gap: 12px; align-items: start; }
-.inbox-list button > :not(.av) { grid-column: 2; }
 .av { grid-row: span 3; width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-family: var(--f-display); font-weight: 900; font-size: .95rem; background: var(--panel-2); color: var(--soft); border: 1px solid var(--line); }
 .av.big { width: 52px; height: 52px; border-radius: 16px; font-size: 1.15rem; flex: none; }
 .av.booked { background: var(--ink); color: var(--on-hivis); border-color: var(--ink); }
@@ -86,11 +80,8 @@
 .av.waiting { border: 2px solid var(--hivis); color: var(--hivis); }
 .av.gathering { border: 2px dashed var(--hivis); color: var(--hivis); }
 .av.opted-out { border-color: var(--red); color: var(--red); }
-.thread-head { justify-content: flex-start; }
-.thread-head .thread-who { flex: 1; min-width: 0; }
 
 /* ---------- Texts: the thread tells the whole story ---------- */
-.thread { grid-template-rows: auto minmax(0, 1fr) auto auto; }
 .sys { align-self: center; display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: .76rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--soft); background: var(--bg); }
 .sys.missed { color: var(--red); border-color: rgba(255, 83, 64, .4); }
 .sys.missed i { width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 4px rgba(255, 83, 64, .15); }
@@ -116,38 +107,13 @@
 .ring-mini circle { fill: none; stroke: var(--dim); stroke-width: 4; }
 .ring-mini .fg { stroke: var(--hivis); stroke-linecap: round; filter: drop-shadow(0 0 4px var(--hivis-glow)); }
 @media (prefers-reduced-motion: reduce) { .animate .msg, .msg.sending, .typing span { animation: none; } }
-/* phones: one column that never grows wider than the screen */
-@media (max-width: 860px) {
-  .inbox { grid-template-columns: minmax(0, 1fr); }
-  .inbox > * { min-width: 0; }
-  .job-panel .actions, .job-panel .book-form, .job-panel .undo { flex-basis: 100%; }
-}
 /* the page itself: one column that can't be pushed wider than the screen (the filter tabs scroll instead) */
 .main { grid-template-columns: minmax(0, 1fr); }
-.page-top > * { min-width: 0; max-width: 100%; }
 
 /* ---------- Phones: works like an app ---------- */
-.back { display: none; }
-@media (max-width: 860px) {
-  /* Texts: the list fills the screen. Tap someone to open their texts; "All texts" goes back. */
-  .inbox-side .inbox-list { max-height: none; overflow: visible; padding: 0; }
-  .inbox-list .group { position: static; background: none; }
-  .inbox:not(.chat-open) > .thread, .inbox:not(.chat-open) > .job-panel { display: none; }
-  .inbox.chat-open > .inbox-side, .page-top.chat-open { display: none; }
-  .inbox.chat-open { grid-template-areas: "thread" "job"; }
-  .back { display: inline-flex; align-items: center; gap: 8px; flex-basis: 100%; min-height: 44px; margin: -6px 0 0 -4px; padding: 0 4px; border: 0; background: none; color: var(--hivis); font: 700 1rem var(--f-body); cursor: pointer; }
-  /* the texts, the quick replies and the reply box all fit on one screen */
-  .msgs { max-height: max(150px, calc(100dvh - 570px)); }
-  .thread-head { padding: 14px 16px; }
-  .thread-who b { font-size: 1.35rem; }
-  .thread-head .thread-who { flex: 1 1 calc(100% - 80px); }
-  .thread-head > .pill { margin: -4px 0 0 66px; }
-  .quick button { padding: 10px 14px; }
-}
 @media (max-width: 720px) {
   /* bigger tap targets */
   .range button { padding: 12px 14px; }
-  .thread-who .edit { min-height: 36px; padding-inline: 12px; }
 }
 
 /* ---------- Phones: clean and flat, like an app (copied from the Base44 sketch) ---------- */
@@ -174,24 +140,6 @@
   .nav a.active { color: var(--hivis); }
   .nav a.active::before { content: ""; position: absolute; top: 0; left: calc(50% - 18px); width: 36px; height: 3px; border-radius: 0 0 3px 3px; background: var(--hivis); }
   .nav svg { width: 22px; height: 22px; }
-}
-.inbox-list .tag { display: none; } /* phones only (see below) */
-@media (max-width: 860px) {
-  /* Texts list: short rows. Name and day on top, one line of preview, a short tag on the right. */
-  .inbox-list button { grid-template-columns: 42px minmax(0, 1fr) auto; row-gap: 2px; padding: 12px; border-radius: 16px; align-items: center; }
-  .inbox-list .av { grid-row: span 2; }
-  .inbox-list b { font-size: 1.02rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .inbox-list .preview { -webkit-line-clamp: 1; font-size: .92rem; }
-  /* the long status pills give way to the short tag */
-  .inbox-list .pills { display: none; }
-  .inbox-list button > .tag { display: inline-block; grid-column: 3; grid-row: 1 / span 2; font: 600 .66rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--hivis); color: var(--hivis); }
-  .inbox-list .tag.waiting { background: var(--hivis); color: var(--on-hivis); }
-  .inbox-list .tag.gathering { border-style: dashed; }
-  .inbox-list .tag.booked { border: 0; padding: 0; font-size: .82rem; }
-  .inbox-list .tag.opted-out { border-color: var(--red); color: var(--red); }
-  /* the list is its own screen on phones, so "last one opened" isn't highlighted. Rows that need you get a green tint. */
-  .inbox-list button.active { border-color: var(--line); background: var(--panel); box-shadow: none; }
-  .inbox-list button.waiting, .inbox-list button.ready { border-color: rgba(200, 255, 46, .3); background: rgba(200, 255, 46, .05); }
 }
 
 /* ---------- Today: "See how it's going" opens and closes the charts ---------- */
@@ -252,16 +200,6 @@ html[data-slide="back"]::view-transition-new(page) { animation: vt-in-left .24s 
 @keyframes vt-out-right { to { translate: 100% var(--was-at, 0); } }
 @keyframes vt-in-left { from { translate: -25% 0; opacity: 0; } }
 
-/* ---------- Phones: swiping a chat away (fx.js moves it) ---------- */
-@media (max-width: 860px) {
-  .inbox.chat-open { position: relative; touch-action: pan-y; }
-  .quick { touch-action: pan-x; }
-  .main:has(.inbox.swiping) { overflow-x: clip; } /* the chat sliding off the side can't make the page scroll sideways */
-  .inbox.swiping { user-select: none; -webkit-user-select: none; }
-  .inbox.swiping > .thread, .inbox.swiping > .job-panel { position: relative; z-index: 1; transform: translateX(var(--swipe, 0)); }
-  .inbox.swiping > .inbox-side { display: grid; position: absolute; inset: 0 0 auto; opacity: calc(.35 + .65 * var(--swipe-p, 0)); transform: translateX(calc(-8% + 8% * var(--swipe-p, 0))); }
-  .inbox.settling > .thread, .inbox.settling > .job-panel, .inbox.settling > .inbox-side { transition: transform .22s var(--ease), opacity .22s; }
-}
 
 /* ---------- Command menu (⌘K) and keyboard hints: for computers, phones never see them ---------- */
 kbd { font: 600 .72rem/1 var(--f-mono); padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--soft); white-space: nowrap; }
@@ -334,3 +272,164 @@ kbd { font: 600 .72rem/1 var(--f-mono); padding: 4px 6px; border-radius: 6px; bo
 .nav a { white-space: nowrap; }
 .nav { flex: none; }
 @media (max-width: 1200px) { .biz { display: none; } }
+
+.page-top > * { min-width: 0; max-width: 100%; }
+
+/* ---------- Texts: the chat is the main thing. Job details only come out when you ask. ---------- */
+.inbox { display: grid; min-width: 0; }
+.inbox > * { min-width: 0; }
+.back { display: none; }
+.inbox-side { grid-area: list; display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+.side-top { display: grid; gap: 12px; }
+.tabs { max-width: 100%; }
+.thread { grid-area: thread; grid-template-rows: auto auto minmax(0, 1fr) auto auto; height: auto; min-height: 0; }
+.job-panel { grid-area: job; min-width: 0; }
+
+/* the list: short rows, name and day on top, one line of preview, a short tag on the right */
+.inbox-list { gap: 2px; max-height: none; padding: 0; }
+.inbox-list button { position: relative; grid-template-columns: 42px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 1px; padding: 10px; border-radius: 16px; border-color: transparent; background: transparent; align-items: center; }
+.inbox-list button > :not(.av):not(.tag) { grid-column: 2; min-width: 0; }
+.inbox-list button:hover { transform: none; border-color: transparent; background: var(--panel); }
+.inbox-list button.active { border-color: var(--line); background: var(--panel-2); box-shadow: none; }
+.inbox-list button.active::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 0 4px 4px 0; background: var(--hivis); }
+.inbox-list .av { grid-row: span 2; }
+.inbox-list b { font-size: 1.02rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-list .preview { -webkit-line-clamp: 1; font-size: .92rem; }
+.inbox-list button > .tag { grid-column: 3; grid-row: 1 / span 2; font: 600 .66rem/1 var(--f-mono); text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--hivis); color: var(--hivis); }
+.inbox-list .tag.waiting { background: var(--hivis); color: var(--on-hivis); }
+.inbox-list .tag.gathering { border-style: dashed; }
+.inbox-list .tag.booked { border: 0; padding: 0; font-size: .82rem; }
+.inbox-list .tag.opted-out { border-color: var(--red); color: var(--red); }
+
+/* the top of the chat */
+.thread-head { flex-wrap: nowrap; justify-content: flex-start; gap: 12px; padding: 12px 18px; }
+.thread-who { flex: 1; min-width: 0; gap: 3px; }
+.thread-who .name-row { min-width: 0; }
+.thread-who b { font-size: 1.4rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.1; }
+.thread-head .av.big { width: 46px; height: 46px; border-radius: 14px; font-size: 1rem; }
+.thread-phone { font-size: .78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.head-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: none; min-height: 42px; min-width: 42px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font: 700 .92rem var(--f-body); text-decoration: none; white-space: nowrap; cursor: pointer; transition: border-color .2s, color .2s; }
+.head-btn:hover { border-color: var(--hivis); }
+.head-btn small { font: 600 .74rem var(--f-mono); color: var(--hivis); }
+.head-btn[aria-expanded="true"] { border-color: var(--hivis); color: var(--hivis); }
+
+/* the bar under it: where the job stands, and booking it */
+.state { display: flex; align-items: center; flex-wrap: nowrap; gap: 16px; padding: 10px 18px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--panel-2); }
+.state-words { flex: 1; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; }
+.state-label { font-size: 1.02rem; white-space: nowrap; letter-spacing: -0.01em; }
+.state p { font-size: .92rem; min-width: 0; }
+.state.ready { box-shadow: none; }
+.state.waiting { border: 0; border-bottom: 1px solid var(--line); padding-top: 18px; }
+.state.waiting::before { height: 6px; }
+.state .meter { flex: 0 0 110px; margin: 0; }
+.state .btn { min-height: 40px; padding: 0 16px; color: var(--ink); font-size: .92rem; }
+.state .btn-main { color: var(--on-hivis); }
+.state.ready .btn-main, .state.ready .btn-main:hover { background: var(--on-hivis); color: var(--hivis); }
+.state.booked .undo { color: var(--on-hivis); background: transparent; border-color: var(--on-hivis); }
+.state.booked .undo:hover { color: var(--on-hivis); border-color: var(--on-hivis); }
+.book-form { flex: none; display: flex; gap: 8px; align-items: center; }
+.book-form input { width: 92px; min-height: 40px; padding: 0 14px; border-radius: 999px; }
+.state.ready .book-form input { background: rgba(0, 0, 0, .12); border-color: rgba(0, 0, 0, .35); color: var(--on-hivis); }
+.state.ready .book-form input::placeholder { color: rgba(0, 0, 0, .6); }
+
+/* the texts and the reply box line up in one comfortable column, however wide the chat is */
+.msgs, .quick, .composer { padding-inline: max(18px, calc((100% - 860px) / 2)); }
+.msg { max-width: min(76%, 600px); }
+.quick { background: transparent; border-top: 1px solid var(--line); -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent); mask-image: linear-gradient(90deg, #000 92%, transparent); }
+.composer { background: transparent; }
+
+/* job details */
+.job-panel-in { display: grid; gap: 18px; align-content: start; padding: 18px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); overflow-y: auto; scrollbar-width: thin; }
+.job-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.job-panel-head h2 { font-size: 1.4rem; font-weight: 900; font-stretch: 112%; }
+.cust-card { display: grid; gap: 4px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.cust-card b { font-family: var(--f-display); font-weight: 800; font-stretch: 108%; font-size: 1.15rem; }
+.cust-card .name-form input { max-width: none; min-width: 0; }
+.job-panel-in .checklist { padding: 0; border: 0; border-radius: 0; background: none; }
+.job-panel-in .checklist h3 { font-size: 1.02rem; font-weight: 800; align-items: center; gap: 10px; }
+.job-panel-in .checklist ul { grid-template-columns: minmax(0, 1fr); }
+
+/* ---- Computers: everything fits the window, and the page itself doesn't scroll ---- */
+@media (min-width: 861px) {
+  .main:has(.inbox) { max-width: 1640px; padding-top: 14px; padding-bottom: 14px; overflow-x: clip; }
+  .inbox { position: relative; height: calc(100dvh - 77px - 28px); min-height: 480px; grid-template-columns: 364px minmax(0, 1fr) 0px; grid-template-areas: "list thread job"; align-items: stretch; transition: grid-template-columns .32s var(--ease); }
+  .thread { margin-left: 16px; }
+  .side-top .page-title { font-size: 2.5rem; line-height: 1; letter-spacing: -0.04em; }
+  .side-top .tabs { display: flex; gap: 4px; padding: 0; border: 0; border-radius: 0; background: none; }
+  .side-top .tabs button { padding: 6px 8px; font-size: .8rem; border: 1px solid var(--line); }
+  .side-top .tabs button[aria-pressed="true"] { border-color: var(--ink); }
+  .side-top .tabs .n { margin-left: 4px; padding: 0 4px; font-size: .68rem; }
+  .inbox-list { flex: 1; min-height: 0; overflow-y: auto; }
+
+  /* job details slide out beside the chat, and the list shrinks to faces so the chat keeps its room */
+  .inbox.job-open { grid-template-columns: 76px minmax(0, 1fr) 396px; }
+  .job-panel { overflow: hidden; visibility: hidden; transition: visibility .32s; }
+  .job-open > .job-panel { visibility: visible; transition: none; }
+  .job-panel-in { width: 380px; height: 100%; margin-left: 16px; }
+  .job-open .side-top, .job-open .search, .job-open .inbox-list .group { display: none; }
+  .job-open .inbox-list button { grid-template-columns: minmax(0, 1fr); justify-items: center; padding: 8px 0; }
+  .job-open .inbox-list button > :not(.av) { display: none; }
+}
+/* small laptops and tablets: job details cover the side of the chat instead of squeezing it */
+@media (min-width: 861px) and (max-width: 1100px) {
+  .inbox.job-open { grid-template-columns: 76px minmax(0, 1fr) 0px; }
+  .job-panel { position: absolute; top: 0; bottom: 0; right: 0; z-index: 5; width: 380px; transform: translateX(calc(100% + 24px)); transition: transform .32s var(--ease), visibility .32s; }
+  .job-open > .job-panel { transform: none; transition: transform .32s var(--ease); }
+  .job-panel-in { margin-left: 0; box-shadow: -20px 0 60px rgba(0, 0, 0, .6); }
+  .thread-when, .head-btn span { display: none; }
+  .head-btn { padding: 0 12px; }
+  .state p { display: none; }
+}
+
+/* ---- Phones: the list is one screen. Tap someone and the chat takes the whole screen, like a texting app. ---- */
+@media (max-width: 860px) {
+  .inbox { grid-template-columns: minmax(0, 1fr); grid-template-areas: "list"; }
+  .inbox:not(.chat-open) > .thread, .inbox:not(.chat-open) > .job-panel { display: none; }
+  .inbox-list { overflow: visible; }
+  .inbox-list .group { position: static; background: none; }
+  .inbox-list button { border-color: var(--line); background: var(--panel); margin-bottom: 6px; }
+  .inbox-list button.active { background: var(--panel); }
+  .inbox-list button.active::before { display: none; }
+  .inbox-list button.waiting, .inbox-list button.ready { border-color: rgba(200, 255, 46, .3); background: rgba(200, 255, 46, .05); }
+
+  body:has(.inbox.chat-open) .bar { display: none; }
+  .main:has(.inbox.chat-open) { padding: 0; max-width: none; }
+  .inbox.chat-open { grid-template-areas: "thread"; position: relative; touch-action: pan-y; }
+  .inbox.chat-open > .inbox-side { display: none; }
+  .thread { height: var(--screen, 100dvh); border: 0; border-radius: 0; background: var(--bg); }
+  .thread-head { gap: 8px; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 8px max(4px, env(safe-area-inset-left)); }
+  .back { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 44px; padding: 0; border: 0; background: none; color: var(--hivis); cursor: pointer; }
+  .back svg { width: 24px; height: 24px; }
+  .back span, .thread-when, .thread-who .edit, .head-btn span, .head-btn small { display: none; }
+  .thread-who b { font-size: 1.15rem; }
+  .thread-head .av.big { width: 40px; height: 40px; border-radius: 12px; font-size: .9rem; }
+  .head-btn { min-width: 44px; min-height: 44px; padding: 0; }
+  .state { gap: 10px; padding: 8px 12px; }
+  .state.waiting { padding-top: 14px; }
+  .state p { display: none; }
+  .state-label { font-size: .82rem; white-space: normal; line-height: 1.1; }
+  .state .meter { flex-basis: 56px; }
+  .state .btn { min-height: 44px; padding: 0 14px; font-size: .86rem; }
+  .book-form input { width: 76px; min-height: 44px; padding: 0 12px; font-size: 1rem; }
+  .msgs { padding-inline: 14px; }
+  .quick { padding: 8px 12px 0; touch-action: pan-x; border-top: 1px solid var(--line); }
+  .quick button { padding: 10px 14px; }
+  .composer { padding: 8px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  .composer input { font-size: 1rem; }
+
+  /* job details: a sheet that comes up from the bottom. Drag its top down, tap outside, or press X to close. */
+  .job-panel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; visibility: hidden; transform: translateY(calc(100% + 24px)); transition: transform .3s var(--ease), visibility .3s; }
+  .job-open > .job-panel { visibility: visible; transform: translateY(var(--sheet, 0px)); transition: transform .3s var(--ease); }
+  .job-panel.dragging { transition: none; }
+  .job-panel-in { max-height: 85dvh; border-width: 1px 0 0; border-radius: 24px 24px 0 0; padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+  .job-panel-head { position: relative; padding-top: 10px; touch-action: none; }
+  .job-panel-head::before { content: ""; position: absolute; top: -8px; left: calc(50% - 22px); width: 44px; height: 5px; border-radius: 3px; background: var(--dim); }
+  .inbox.job-open::after { content: ""; position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, .6); }
+
+  /* swiping a chat away (fx.js moves it): the list shows underneath */
+  .main:has(.inbox.swiping) { overflow-x: clip; }
+  .inbox.swiping { user-select: none; -webkit-user-select: none; }
+  .inbox.swiping > .thread { position: relative; z-index: 1; transform: translateX(var(--swipe, 0)); box-shadow: -12px 0 40px rgba(0, 0, 0, .5); }
+  .inbox.swiping > .inbox-side { display: flex; position: absolute; inset: 28px 16px auto; opacity: calc(.35 + .65 * var(--swipe-p, 0)); transform: translateX(calc(-8% + 8% * var(--swipe-p, 0))); }
+  .inbox.settling > .thread, .inbox.settling > .inbox-side { transition: transform .22s var(--ease), opacity .22s; }
+}

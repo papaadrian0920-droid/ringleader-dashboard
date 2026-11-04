@@ -241,7 +241,7 @@
   main.addEventListener('pointerdown', e => {
     const inbox = e.target.closest('.inbox.chat-open');
     // the first bit of the screen edge belongs to the phone's own back swipe
-    if (!inbox || e.pointerType !== 'touch' || !isPhone() || e.clientX < 24 || e.target.closest('.quick, input, textarea, a')) return;
+    if (!inbox || e.pointerType !== 'touch' || !isPhone() || e.clientX < 24 || e.target.closest('.quick, .job-panel, input, textarea, a') || inbox.classList.contains('job-open')) return;
     swipe = { inbox, id: e.pointerId, x: e.clientX, y: e.clientY, at: e.timeStamp, from: 0, dragging: false };
   });
   addEventListener('pointermove', e => {
@@ -272,6 +272,34 @@
   }
   addEventListener('pointerup', endSwipe);
   addEventListener('pointercancel', endSwipe);
+
+  // ---------- Phones: drag the job details sheet down by its top to close it ----------
+  let sheetDrag = null;
+  main.addEventListener('pointerdown', e => {
+    const head = e.target.closest('.job-panel-head');
+    if (!head || e.pointerType !== 'touch' || e.target.closest('button') || !isPhone()) return;
+    sheetDrag = { id: e.pointerId, y: e.clientY, panel: head.closest('.job-panel'), inbox: head.closest('.inbox') };
+    sheetDrag.panel.classList.add('dragging');
+  });
+  addEventListener('pointermove', e => {
+    if (sheetDrag?.id === e.pointerId) sheetDrag.inbox.style.setProperty('--sheet', Math.max(0, e.clientY - sheetDrag.y) + 'px');
+  });
+  function endSheetDrag(e) {
+    if (sheetDrag?.id !== e.pointerId) return;
+    const { panel, inbox, y } = sheetDrag;
+    sheetDrag = null;
+    panel.classList.remove('dragging');
+    inbox.style.removeProperty('--sheet');
+    if (e.type === 'pointerup' && e.clientY - y > 90) setJobOpen(false);
+  }
+  addEventListener('pointerup', endSheetDrag);
+  addEventListener('pointercancel', endSheetDrag);
+
+  // ---------- Phones: the chat always fits above the keyboard ----------
+  if (window.visualViewport) visualViewport.addEventListener('resize', () => {
+    document.documentElement.style.setProperty('--screen', visualViewport.height + 'px');
+    if (isPhone() && chatOpen) { window.scrollTo(0, 0); const msgs = document.getElementById('msgs'); if (msgs) msgs.scrollTop = msgs.scrollHeight; }
+  });
 
   // ---------- after every page draw ----------
   addEventListener('rl:render', e => {

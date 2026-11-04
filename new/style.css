@@ -245,8 +245,6 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
 .tabs .n { font-family: var(--f-mono); font-size: .76rem; margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--panel-2); color: var(--soft); }
 .tabs button[aria-pressed="true"] .n { background: var(--on-hivis); color: var(--ink); }
 
-/* Three columns: who texted, the texts, and the job. Narrower screens put the job above the texts. */
-.inbox { display: grid; grid-template-columns: minmax(240px, 320px) minmax(0, 1fr) minmax(300px, 380px); grid-template-areas: "list thread job"; gap: 16px; align-items: start; }
 .inbox-list { grid-area: list; display: grid; gap: 8px; align-content: start; max-height: 78vh; overflow-y: auto; padding: 2px 4px 2px 2px; scrollbar-width: thin; }
 .inbox-list button { text-align: left; display: grid; gap: 8px; padding: 16px; border-radius: 18px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; transition: border-color .2s, transform .2s var(--ease), background .2s; }
 .inbox-list button:hover { border-color: var(--mid); transform: translateX(3px); }
@@ -287,14 +285,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
 .composer { display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--line); background: var(--bg); }
 .composer input { border-radius: 999px; padding-inline: 18px; }
 
-/* ---- The job panel ---- */
-.job-panel { grid-area: job; display: flex; flex-wrap: wrap; gap: 12px; position: sticky; top: 104px; }
-.job-panel > .state, .job-panel > .checklist { flex: 1 1 100%; }
-.job-panel .actions { flex: 1 1 200px; display: flex; gap: 8px; }
-.job-panel .actions .btn { flex: 1; }
-.job-panel .book-form, .job-panel .undo { flex: 1 1 260px; }
-.job-panel .book-form input { flex: 1; min-width: 0; border-radius: 999px; padding-inline: 16px; }
-
+/* ---- Job details and the next-step bar: layout is in fx.css ---- */
 .state { position: relative; overflow: hidden; padding: 20px 22px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); display: grid; gap: 8px; }
 .state-label { font-family: var(--f-display); font-weight: 900; font-stretch: 120%; font-size: 1.75rem; line-height: 1; text-transform: uppercase; letter-spacing: -0.03em; }
 .state p { color: var(--soft); font-size: 1.02rem; }
@@ -334,17 +325,6 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
 .unsure-note { padding: 10px 14px; border-radius: 12px; background: var(--panel-2); border-left: 4px solid var(--hivis); font-weight: 600; }
 .plain-summary { font-size: 1.1rem; font-weight: 700; }
 
-@media (max-width: 1360px) {
-  .inbox { grid-template-columns: minmax(240px, 310px) minmax(0, 1fr); grid-template-areas: "list job" "list thread"; }
-  .job-panel { position: static; }
-  .inbox-list { grid-row: 1 / span 2; max-height: none; }
-}
-@media (max-width: 860px) {
-  .inbox { grid-template-columns: 1fr; grid-template-areas: "list" "job" "thread"; }
-  .inbox-list { grid-row: auto; max-height: 300px; }
-  .thread { height: auto; min-height: 480px; }
-  .msgs { max-height: 60vh; }
-}
 
 /* ---------- Settings ---------- */
 .checklist-chips { list-style: none; margin: -2px 0 6px 52px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; counter-reset: item; }

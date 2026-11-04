@@ -331,3 +331,8 @@ kbd { font: 600 .72rem/1 var(--f-mono); padding: 4px 6px; border-radius: 6px; bo
   .toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
   .nav { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 }
+
+/* ---------- Top bar: menu words stay on one line. Short of room, the shop's name gives way first. ---------- */
+.nav a { white-space: nowrap; }
+.nav { flex: none; }
+@media (max-width: 1200px) { .biz { display: none; } }

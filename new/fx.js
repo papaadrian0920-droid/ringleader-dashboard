@@ -1,5 +1,5 @@
 // Ringleader dashboard extras: the 3D call radar on Today, the sliding menu highlight,
-// and cards that light up and lean toward the cursor.
+// and job cards that lean toward the cursor.
 // app.js fires "rl:render" every time it draws a page; everything here hooks into that.
 (function () {
   const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -212,14 +212,13 @@
   }
   addEventListener('resize', moveBlob);
 
-  // ---------- Cards: a spotlight follows the cursor; job cards lean toward it ----------
+  // ---------- Job cards lean toward the cursor ----------
   if (matchMedia('(hover: hover)').matches) {
     document.addEventListener('pointermove', e => {
-      const el = e.target.closest && e.target.closest('.card, .job, .tile, .plan');
+      const el = e.target.closest && e.target.closest('.job');
       if (!el) return;
       const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-      el.style.setProperty('--mx', x * 100 + '%'); el.style.setProperty('--my', y * 100 + '%');
-      if (!still && el.classList.contains('job')) el.style.transform = `perspective(900px) rotateX(${(0.5 - y) * 8}deg) rotateY(${(x - 0.5) * 10}deg) translateY(-4px)`;
+      if (!still) el.style.transform = `perspective(900px) rotateX(${(0.5 - y) * 8}deg) rotateY(${(x - 0.5) * 10}deg) translateY(-4px)`;
     });
     document.addEventListener('pointerout', e => {
       const el = e.target.closest && e.target.closest('.job');

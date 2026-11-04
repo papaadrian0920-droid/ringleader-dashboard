@@ -91,7 +91,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .btn:active { transform: translateY(1px) scale(.98); }
 .btn:disabled { opacity: .5; cursor: progress; }
 .btn-main { background: var(--hivis); color: var(--on-hivis); border-color: var(--hivis); }
-.btn-main:hover { background: var(--hivis); transform: translateY(-2px) rotate(-1deg); box-shadow: 0 10px 30px -8px var(--hivis-glow); }
+.btn-main:hover { background: var(--hivis); transform: translateY(-2px) rotate(-1deg); }
 
 input:not([type="checkbox"]), textarea { width: 100%; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 1rem; transition: border-color .2s, box-shadow .2s; }
 input:not([type="checkbox"]):focus, textarea:focus { outline: none; border-color: var(--hivis); box-shadow: 0 0 0 4px rgba(200, 255, 46, .15); }
@@ -138,7 +138,7 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
 .needs-head h2 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 900; font-stretch: 115%; line-height: .95; }
 .needs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .job { display: grid; gap: 14px; align-content: space-between; padding: 22px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); text-decoration: none; transition: transform .25s var(--ease), border-color .2s, box-shadow .25s; min-height: 210px; }
-.job:hover { transform: translateY(-4px) rotate(-.4deg); border-color: var(--hivis); box-shadow: 0 18px 50px -20px var(--hivis-glow); }
+.job:hover { transform: translateY(-4px) rotate(-.4deg); border-color: var(--hivis); }
 .job .job-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .job time { font-family: var(--f-mono); font-size: .82rem; font-weight: 600; color: var(--soft); }
 .job .quote { font-size: 1.2rem; font-weight: 600; line-height: 1.35; }

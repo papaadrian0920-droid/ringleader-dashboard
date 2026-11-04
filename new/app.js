@@ -638,7 +638,7 @@ function conversationsPage() {
 
     <section class="inbox${chatOpen ? ' chat-open' : ''}">
       <div class="inbox-side">
-        <label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span hidden>Search</span><input id="search" type="search" placeholder="Search names, numbers, texts" value="${esc(search)}" autocomplete="off"></label>
+        <label class="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span hidden>Search</span><input id="search" type="search" placeholder="Search names, numbers, texts" value="${esc(search)}" autocomplete="off"><kbd class="key-hint" aria-hidden="true">/</kbd></label>
         <div class="inbox-list">${listHtml(list)}</div>
       </div>
       ${c ? threadHtml(c) + jobPanel(c) : `<div class="thread"><p class="empty" style="padding: 24px">Pick a conversation.</p></div>`}
@@ -1040,15 +1040,22 @@ window.addEventListener('hashchange', () => {
 });
 
 // Phones: close the open chat and show the list again.
+let backPending = false; // history.back() takes a moment; the list doesn't wait for it
 // slid: the finger already moved it off screen, so no second animation.
 function closeChat({ slid = false } = {}) {
   const inHistory = chatInHistory;
   chatOpen = chatInHistory = false;
   if (slid) redrawAtTop(); else transition('back', redrawAtTop);
-  if (inHistory) history.back(); // takes the chat's step off the Back button's list
+  if (inHistory) { backPending = true; history.back(); } // takes the chat's step off the Back button's list
 }
 // The phone's Back button (or swipe back) closes an open chat instead of leaving the page.
 window.addEventListener('popstate', e => {
+  if (backPending) {
+    backPending = false;
+    // they already tapped into another chat while that step was coming off
+    if (chatOpen && isPhone()) { history.pushState({ chat: true }, ''); chatInHistory = true; }
+    return;
+  }
   if (!chatInHistory) return;
   chatOpen = chatInHistory = false;
   // Phones that animate their own back swipe don't need ours on top.
@@ -1106,7 +1113,7 @@ main.addEventListener('click', async e => {
     chatOpen = true;
     if (location.hash === '#conversations') {
       e.preventDefault();
-      if (isPhone() && !chatInHistory) { history.pushState({ chat: true }, ''); chatInHistory = true; }
+      if (isPhone() && !chatInHistory && !backPending) { history.pushState({ chat: true }, ''); chatInHistory = true; }
       if (isPhone()) transition('forward', redrawAtTop); else render();
     }
     return;
@@ -1291,6 +1298,103 @@ async function saveName(form) {
     return () => { c.name = before; };
   }, `/api/conversations/${id}/name`, { name });
 }
+
+// ---------- Command menu: ⌘K (Ctrl K on Windows) jumps to any page or person ----------
+
+const onMac = /Mac|iPhone|iPad/.test(navigator.platform);
+const SHORTCUTS = [['overview', 'Today', '1'], ['conversations', 'Texts', '2'], ['autotext', 'Settings', '3'], ['frontdesk', 'Next up', '4']];
+let menu = null, menuRows = [], menuPick = 0;
+
+function goToChat(id) {
+  filter = 'all'; search = ''; openId = id; editingName = false; chatOpen = true;
+  if (currentPage() === 'conversations') render(); else location.hash = 'conversations';
+}
+function goToRange(days) {
+  range = days;
+  animateNext = true;
+  if (currentPage() === 'overview') render(); else location.hash = 'overview';
+}
+// Everything the menu can do. With nothing typed, it shows the pages and who needs you.
+function menuCommands(typed) {
+  const word = typed.trim().toLowerCase();
+  const fits = text => text.toLowerCase().includes(word);
+  const pages = SHORTCUTS.map(([page, label, key]) => ({ label, hint: 'Page', key, run: () => { location.hash = page; } }));
+  const views = [
+    { label: 'Texts that need you', hint: 'Texts', run: () => { filter = 'needs'; search = ''; if (currentPage() === 'conversations') render(); else location.hash = 'conversations'; } },
+    ...[7, 30, 60].map(days => ({ label: `Last ${days} days`, hint: 'Today', run: () => goToRange(days) }))
+  ];
+  const people = data.conversations
+    .filter(c => word ? fits(`${who(c)} ${c.phone} #${c.id}`) : needsYou(c))
+    .map(c => ({ label: who(c), hint: STATUS[c.status] || '', run: () => goToChat(c.id) }));
+  return word ? [...people, ...pages, ...views].filter(c => people.some(p => p === c) || fits(c.label)).slice(0, 8) : [...pages, ...people.slice(0, 4), ...views];
+}
+function drawMenu() {
+  const list = menu.querySelector('.cmdk-list');
+  menuRows = menuCommands(menu.querySelector('input').value);
+  menuPick = Math.min(menuPick, Math.max(0, menuRows.length - 1));
+  list.innerHTML = menuRows.length
+    ? menuRows.map((c, i) => `<button type="button" role="option" id="cmdk-${i}" tabindex="-1" data-row="${i}" aria-selected="${i === menuPick}"><b>${esc(c.label)}</b><span>${esc(c.hint)}</span>${c.key ? `<kbd>${c.key}</kbd>` : ''}</button>`).join('')
+    : '<p class="empty">Nothing matches that.</p>';
+  menu.querySelector('input').setAttribute('aria-activedescendant', menuRows.length ? `cmdk-${menuPick}` : '');
+  list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+}
+function runMenuRow(i) {
+  const row = menuRows[i];
+  if (!row) return;
+  menu.close();
+  row.run();
+}
+function openMenu() {
+  if (!menu) {
+    menu = document.createElement('dialog');
+    menu.className = 'cmdk';
+    menu.setAttribute('aria-label', 'Jump to a page or person');
+    menu.innerHTML = `
+      <input type="text" role="combobox" aria-expanded="true" aria-controls="cmdk-list" aria-label="Jump to a page or person" placeholder="Jump to a page or person…" autocomplete="off" spellcheck="false">
+      <div class="cmdk-list" id="cmdk-list" role="listbox"></div>
+      <p class="cmdk-foot"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></p>`;
+    document.body.append(menu);
+    menu.querySelector('input').addEventListener('input', () => { menuPick = 0; drawMenu(); });
+    menu.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!menuRows.length) return;
+        menuPick = (menuPick + (e.key === 'ArrowDown' ? 1 : -1) + menuRows.length) % menuRows.length;
+        drawMenu();
+      }
+      if (e.key === 'Enter') { e.preventDefault(); runMenuRow(menuPick); }
+    });
+    menu.addEventListener('click', e => {
+      if (e.target === menu) { menu.close(); return; } // clicked outside the box
+      const row = e.target.closest('[data-row]');
+      if (row) runMenuRow(Number(row.dataset.row));
+    });
+  }
+  menu.querySelector('input').value = '';
+  menuPick = 0;
+  drawMenu();
+  menu.showModal();
+  menu.querySelector('input').focus();
+}
+
+document.querySelector('[data-cmdk]').addEventListener('click', openMenu);
+document.querySelector('[data-cmdk] kbd').textContent = onMac ? '⌘K' : 'Ctrl K';
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    if (menu?.open) menu.close(); else openMenu();
+    return;
+  }
+  // The single keys only work when you aren't typing in something.
+  if (e.metaKey || e.ctrlKey || e.altKey || menu?.open) return;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+  const page = SHORTCUTS.find(s => s[2] === e.key);
+  if (page) { location.hash = page[0]; return; }
+  if (e.key === '/' && document.getElementById('search')) {
+    e.preventDefault();
+    document.getElementById('search').focus();
+  }
+});
 
 if (showSavedCopy()) render();
 refresh();

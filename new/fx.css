@@ -264,3 +264,29 @@ html[data-slide="back"]::view-transition-new(page) { animation: vt-in-left .24s 
   .inbox.swiping > .inbox-side { display: grid; position: absolute; inset: 0 0 auto; opacity: calc(.35 + .65 * var(--swipe-p, 0)); transform: translateX(calc(-8% + 8% * var(--swipe-p, 0))); }
   .inbox.settling > .thread, .inbox.settling > .job-panel, .inbox.settling > .inbox-side { transition: transform .22s var(--ease), opacity .22s; }
 }
+
+/* ---------- Command menu (⌘K) and keyboard hints: for computers, phones never see them ---------- */
+kbd { font: 600 .72rem/1 var(--f-mono); padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--soft); white-space: nowrap; }
+.cmdk-btn, .key-hint { display: none; }
+@media (hover: hover) and (min-width: 1001px) {
+  .cmdk-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--soft); font: 600 .86rem var(--f-body); white-space: nowrap; cursor: pointer; transition: border-color .2s, color .2s; }
+  .cmdk-btn:hover { border-color: var(--hivis); color: var(--ink); }
+}
+@media (hover: hover) and (min-width: 861px) { .key-hint { display: inline; } .search input:focus + .key-hint { display: none; } }
+.cmdk { width: min(560px, calc(100vw - 32px)); max-height: min(520px, 80dvh); margin: 12vh auto auto; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--ink); box-shadow: 0 30px 90px rgba(0, 0, 0, .7); }
+.cmdk[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; animation: cmdk-in .18s var(--ease); }
+.cmdk::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+@keyframes cmdk-in { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.cmdk input { width: 100%; min-height: 58px; padding: 0 20px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); font: 500 1.05rem var(--f-body); outline: none; box-shadow: none; }
+.cmdk-list { overflow-y: auto; padding: 8px; display: grid; gap: 2px; align-content: start; min-height: 0; }
+.cmdk-list .empty { padding: 16px 12px; }
+.cmdk-list button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: var(--ink); font: 500 1rem var(--f-body); text-align: left; cursor: pointer; }
+.cmdk-list button b { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmdk-list button span { font: 600 .72rem var(--f-mono); text-transform: uppercase; letter-spacing: .04em; color: var(--mid); white-space: nowrap; }
+.cmdk-list button:hover { background: var(--panel-2); }
+.cmdk-list button[aria-selected="true"] { background: var(--hivis); color: var(--on-hivis); }
+.cmdk-list button[aria-selected="true"] span { color: var(--on-hivis); }
+.cmdk-list button[aria-selected="true"] kbd { background: transparent; border-color: var(--on-hivis); color: var(--on-hivis); }
+.cmdk-foot { display: flex; gap: 18px; padding: 10px 16px; border-top: 1px solid var(--line); font: 600 .72rem var(--f-mono); color: var(--mid); }
+.cmdk-foot span { display: inline-flex; align-items: center; gap: 4px; }
+@media (prefers-reduced-motion: reduce) { .cmdk[open] { animation: none; } }

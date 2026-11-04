@@ -268,7 +268,7 @@ html[data-slide="back"]::view-transition-new(page) { animation: vt-in-left .24s 
 /* ---------- Command menu (⌘K) and keyboard hints: for computers, phones never see them ---------- */
 kbd { font: 600 .72rem/1 var(--f-mono); padding: 4px 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel-2); color: var(--soft); white-space: nowrap; }
 .cmdk-btn, .key-hint { display: none; }
-@media (hover: hover) and (min-width: 1001px) {
+@media (hover: hover) and (min-width: 1300px) {
   .cmdk-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--soft); font: 600 .86rem var(--f-body); white-space: nowrap; cursor: pointer; transition: border-color .2s, color .2s; }
   .cmdk-btn:hover { border-color: var(--hivis); color: var(--ink); }
 }
@@ -290,3 +290,44 @@ kbd { font: 600 .72rem/1 var(--f-mono); padding: 4px 6px; border-radius: 6px; bo
 .cmdk-foot { display: flex; gap: 18px; padding: 10px 16px; border-top: 1px solid var(--line); font: 600 .72rem var(--f-mono); color: var(--mid); }
 .cmdk-foot span { display: inline-flex; align-items: center; gap: 4px; }
 @media (prefers-reduced-motion: reduce) { .cmdk[open] { animation: none; } }
+
+/* ---------- Numbers keep their width, so counters and prices don't jiggle ---------- */
+.hero-money, .ring-num, .tile b, .big-count, .count, .tabs .n, .col-num, .axis, .flag-text, time, .range button, .fold-sum, .thread-phone, .tag, .pill, .state-label, .note { font-variant-numeric: tabular-nums; }
+
+/* ---------- No single word left alone on the last line ---------- */
+.quote, .tile span, .ring > span, .f-step, .preview, .state p { text-wrap: pretty; }
+.state-label { text-wrap: balance; }
+
+/* ---------- Smooth corners, like an iPhone icon, where the browser can draw them. Pills stay round. ---------- */
+@supports (corner-shape: squircle) {
+  :root { --radius: 30px; }
+  .card, .job, .tile, .fold-btn, .thread, .sim, .state, .all-clear, .cmdk, .av, .logo-mark, .inbox-list button, .skel-grid i, .skel-card { corner-shape: squircle; }
+}
+
+/* ---------- Fingers: every tap target is at least 44px, even when the thing you see is smaller ---------- */
+@media (max-width: 860px) {
+  .range button { min-width: 44px; min-height: 44px; }
+  .quick button { min-height: 44px; }
+  .toggle { min-height: 44px; }
+  .logo, .edit, .card-head .link { position: relative; }
+  .logo::after { content: ""; position: absolute; inset: -6px 0; }
+  .edit::after { content: ""; position: absolute; inset: -6px -4px; }
+  .card-head .link::after { content: ""; position: absolute; inset: -10px -8px; }
+}
+
+/* ---------- The iPhone notch and home bar never cover anything, upright or sideways ---------- */
+.bar {
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-left: max(clamp(16px, 4vw, 40px), env(safe-area-inset-left));
+  padding-right: max(clamp(16px, 4vw, 40px), env(safe-area-inset-right));
+}
+.main {
+  padding-left: max(clamp(16px, 4vw, 40px), env(safe-area-inset-left));
+  padding-right: max(clamp(16px, 4vw, 40px), env(safe-area-inset-right));
+  padding-bottom: calc(120px + env(safe-area-inset-bottom));
+}
+.toast { bottom: calc(28px + env(safe-area-inset-bottom)); }
+@media (max-width: 720px) {
+  .toast { bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .nav { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+}

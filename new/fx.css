@@ -1,16 +1,15 @@
 /* Extras on top of style.css: the 3D call radar, a slow-moving glow behind everything,
    and the sliding menu highlight. fx.js drives the moving parts. */
 
-/* a slow green glow drifting behind the whole app */
+/* a soft green glow behind the whole app */
 .app::before, .app::after { content: ""; position: fixed; z-index: -1; width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(80px); pointer-events: none; opacity: .5; }
-.app::before { left: -20vmax; top: -25vmax; background: radial-gradient(circle, rgba(200, 255, 46, .12), transparent 65%); animation: drift 26s ease-in-out infinite alternate; }
-.app::after { right: -25vmax; top: 20vh; background: radial-gradient(circle, rgba(120, 200, 160, .07), transparent 65%); animation: drift 32s ease-in-out infinite alternate-reverse; }
-@keyframes drift { to { transform: translate(14vmax, 10vmax) scale(1.15); } }
+.app::before { left: -20vmax; top: -25vmax; background: radial-gradient(circle, rgba(200, 255, 46, .12), transparent 65%); }
+.app::after { right: -25vmax; top: 20vh; background: radial-gradient(circle, rgba(120, 200, 160, .07), transparent 65%); }
 
 /* ---------- Today: the radar ---------- */
 .hero { align-items: center; }
 .hero-viz { position: relative; display: grid; gap: 6px; }
-.radar-slot { position: relative; height: clamp(320px, 36vw, 470px); margin: -20px -10px 0; }
+.radar-slot { position: relative; height: clamp(240px, 22vw, 320px); margin: -8px -10px 0; }
 .radar { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: grab; }
 .radar-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font-family: var(--f-mono); font-size: .74rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--soft); }
 .radar-legend span { display: inline-flex; align-items: center; gap: 7px; }
@@ -20,15 +19,11 @@
 .lg-none { background: #55555C; }
 @media (max-width: 860px) { .radar-slot { height: min(92vw, 400px); margin: 0 -8px; } }
 
-/* the big number gets a slow sheen across it */
-.hero-money { background: linear-gradient(100deg, var(--hivis) 0 42%, #F2FFC9 50%, var(--hivis) 58% 100%) 0 0 / 260% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(0 0 40px rgba(200, 255, 46, .25)); animation: sheen 7s ease-in-out infinite; }
-@keyframes sheen { 0%, 55% { background-position: 100% 0; } 100% { background-position: -60% 0; } }
-
 /* ---------- menu: one highlight that slides to the page you're on ---------- */
 @media (min-width: 721px) { .nav { position: relative; } } /* on phones it's already fixed to the bottom */
 .nav a { position: relative; z-index: 1; }
 .nav a.active { background: transparent; }
-.nav-blob { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 999px; background: var(--hivis); box-shadow: 0 0 24px var(--hivis-glow); transition: transform .5s var(--ease), width .5s var(--ease), height .5s var(--ease), opacity .3s; pointer-events: none; }
+.nav-blob { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 999px; background: var(--hivis); transition: transform .5s var(--ease), width .5s var(--ease), height .5s var(--ease), opacity .3s; pointer-events: none; }
 
 /* ---------- cards ---------- */
 .card { transition: border-color .3s, transform .4s var(--ease); }
@@ -41,7 +36,6 @@
 @media (min-width: 721px) { @keyframes in { from { opacity: 0; transform: translateY(18px) scale(.985); filter: blur(6px); } } }
 
 @media (prefers-reduced-motion: reduce) {
-  .app::before, .app::after, .hero-money { animation: none; }
   .nav-blob { transition: none; }
 }
 
@@ -124,18 +118,16 @@
 @media (max-width: 860px) {
   /* Flat, no glow: things stay green, they just don't light up */
   .app::before, .app::after, body::before { display: none; }
-  .hero-money { animation: none; filter: none; }
-  .logo-mark, .av.ready, .sys.booked, .meter i, .f-row.win .f-fill, .feed .dot.booked, .feed .dot.ready, .state.ready, .lg-booked { box-shadow: none; }
-  .ring .arc, .ring-mini .fg { filter: none; }
-  .page-title .hi { text-shadow: none; }
-  /* the ticker is a flat green bar inside the page, not a tilted strip across it */
-  .ticker { transform: none; margin-inline: 0; border: 0; border-radius: 999px; }
 }
+/* Things stay green, they just don't light up. Only the radar and real live info move. */
+.av.ready, .sys.booked, .meter i, .f-row.win .f-fill, .feed .dot.booked, .feed .dot.ready, .state.ready, .lg-booked { box-shadow: none; }
+.ring .arc, .ring-mini .fg { filter: none; }
+.page-title .hi { text-shadow: none; }
 @media (max-width: 720px) {
   /* the bottom menu: a plain bar across the bottom, like an app. The page you're on is green with a line on top. */
   .nav { left: 0; right: 0; bottom: 0; border-radius: 0; border: 0; border-top: 1px solid var(--line); background: var(--bg); box-shadow: none; padding: 0 0 env(safe-area-inset-bottom); gap: 0; }
   .nav-blob { display: none; }
-  .nav a { padding: 10px 4px 8px; border-radius: 0; color: var(--mid); font-family: var(--f-mono); font-size: .66rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .nav a { padding: 10px 4px 8px; border-radius: 0; color: var(--soft); font-family: var(--f-mono); font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
   .nav a:hover { background: transparent; }
   .nav a.active { color: var(--hivis); }
   .nav a.active::before { content: ""; position: absolute; top: 0; left: calc(50% - 18px); width: 36px; height: 3px; border-radius: 0 0 3px 3px; background: var(--hivis); }

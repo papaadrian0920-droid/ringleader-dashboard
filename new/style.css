@@ -43,7 +43,7 @@ button, input, textarea { font: inherit; color: inherit; }
 /* ---------- Top bar ---------- */
 .bar { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 18px; padding: 12px clamp(16px, 4vw, 40px); background: rgba(11, 11, 12, .8); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
 .logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-.logo-mark { width: 34px; height: 34px; border-radius: 10px; background: var(--hivis); color: var(--on-hivis); display: grid; place-items: center; transform: rotate(-8deg); box-shadow: 0 0 24px var(--hivis-glow); transition: transform .3s var(--ease); }
+.logo-mark { width: 34px; height: 34px; border-radius: 10px; background: var(--hivis); color: var(--on-hivis); display: grid; place-items: center; transform: rotate(-8deg); transition: transform .3s var(--ease); }
 .logo:hover .logo-mark { transform: rotate(4deg) scale(1.06); }
 .logo-mark svg { width: 19px; height: 19px; }
 .logo-text { font-family: var(--f-display); font-weight: 900; font-stretch: 118%; font-size: 1.3rem; letter-spacing: -0.03em; }
@@ -80,7 +80,6 @@ button, input, textarea { font: inherit; color: inherit; }
 .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
 .card h2, .h2 { font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 900; font-stretch: 112%; line-height: 1; }
 .kicker { font-family: var(--f-mono); font-size: .85rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--hivis); display: inline-flex; align-items: center; gap: 10px; }
-.pulse { width: 9px; height: 9px; border-radius: 50%; background: var(--hivis); animation: pulse 1.6s infinite; }
 .note { color: var(--soft); font-size: .95rem; }
 .empty { color: var(--soft); font-size: 1.05rem; }
 .link { font-weight: 700; color: var(--hivis); text-decoration: none; }
@@ -118,19 +117,13 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(20px, 4vw, 48px); align-items: end; padding-top: 12px; }
 .hero-copy { display: grid; gap: 10px; }
 .hero h1 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 800; font-stretch: 108%; color: var(--soft); }
-.hero-money { font-family: var(--f-display); font-weight: 900; font-stretch: 125%; font-size: clamp(4.4rem, 12vw, 9.5rem); line-height: .85; letter-spacing: -0.05em; color: var(--hivis); text-shadow: 0 0 60px rgba(200, 255, 46, .25); font-variant-numeric: tabular-nums; }
+.hero-money { font-family: var(--f-display); font-weight: 900; font-stretch: 125%; font-size: clamp(4.4rem, 12vw, 9.5rem); line-height: .85; letter-spacing: -0.05em; color: var(--hivis); font-variant-numeric: tabular-nums; }
 .hero-sub { font-size: clamp(1.15rem, 2vw, 1.45rem); font-weight: 600; max-width: 24em; }
 .hero-chart { position: relative; }
 .hero-chart svg { width: 100%; height: auto; display: block; overflow: visible; }
 .status-line { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; color: var(--soft); }
 @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } }
 
-/* The ticker of what just happened, like the public site's */
-.ticker { background: var(--hivis); color: var(--on-hivis); overflow: hidden; transform: rotate(-1deg); margin-inline: calc(-1 * clamp(16px, 4vw, 40px)); border-block: 3px solid var(--bg); }
-.ticker-track { display: flex; width: max-content; animation: ticker 40s linear infinite; }
-.ticker-track span { font-family: var(--f-display); font-weight: 900; font-stretch: 118%; text-transform: uppercase; font-size: clamp(1rem, 2vw, 1.3rem); padding: 12px 0; white-space: nowrap; }
-.ticker-track span::after { content: "\2192"; margin-inline: 24px; }
-@keyframes ticker { to { transform: translateX(-50%); } }
 
 /* ---------- Today: needs you ---------- */
 .needs-head { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
@@ -399,7 +392,6 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
 .animate > *:nth-child(4) { animation-delay: .18s; }
 .animate > *:nth-child(5) { animation-delay: .24s; }
 .animate > *:nth-child(6) { animation-delay: .3s; }
-.animate > .ticker { animation: none; }
 @keyframes in { from { opacity: 0; transform: translateY(16px); } }
 
 @media (prefers-reduced-motion: reduce) {

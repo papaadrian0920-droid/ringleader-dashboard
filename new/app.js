@@ -49,6 +49,8 @@ const who = c => c.name || c.phone;
 const lastText = c => c.messages.length ? c.messages[c.messages.length - 1].text : '';
 const lastCustomerText = c => [...c.messages].reverse().find(m => m.from === 'customer')?.text || lastText(c);
 const customerReplied = c => c.messages.some(m => m.from === 'customer');
+// A caller who never wrote back: the last text is just our own auto-text, so say what's actually going on.
+const lineFor = c => !customerReplied(c) && !c.messages.some(m => m.from === 'owner') ? "Hasn't replied yet" : lastText(c);
 // How many days Today looks back over: 7, 30 or 60 (the buttons at the top of Today).
 let range = 7;
 const busyDemo = /[?&]busy\b/.test(location.search);
@@ -226,13 +228,13 @@ function overviewPage() {
       ? 'Test mode. Nothing is really sent. Open the simulator to try it.'
       : busyDemo
         ? `Example: two busy months. <a class="link" href="${location.pathname}#overview">Back to the quiet week</a>`
-        : `Example data. Start the server to see your real calls. <a class="link" href="?busy#overview">See it after two busy months &rarr;</a>`;
+        : `Example shop. Your real calls show up here once you're set up. <a class="link" href="?busy#overview">See it after two busy months &rarr;</a>`;
 
   return `
     <section class="hero" aria-label="This week">
       <div class="hero-copy">
         <div class="range-row">
-          <p class="kicker"><span class="pulse"></span>Last ${range} days</p>
+          <p class="kicker">Last ${range} days</p>
           <div class="range" role="group" aria-label="How far back to look">${[7, 30, 60].map(n => `<button type="button" data-range="${n}" aria-pressed="${n === range}">${n}d</button>`).join('')}</div>
         </div>
         <h1>${esc(greeting())}</h1>
@@ -245,8 +247,6 @@ function overviewPage() {
         <p class="radar-legend"><span><i class="lg-booked"></i>Booked (taller = bigger job)</span><span><i class="lg-replied"></i>Texted back</span><span><i class="lg-none"></i>No reply</span></p>
       </div>
     </section>
-
-    ${tickerHtml()}
 
     ${mode === 'test' ? testPanel() : ''}
 
@@ -324,22 +324,6 @@ function toggleFold(btn) {
   try { localStorage.setItem(FOLD_KEY, open ? 'open' : 'closed'); } catch {}
 }
 
-// The green ticker of what just happened, newest first.
-function tickerHtml() {
-  const events = data.conversations.slice(0, 10).map(c => ({
-    booked: `${who(c)} booked ${money(c.value)}`,
-    ready: `${who(c)} is ready to book`,
-    waiting: `${who(c)} texted back`,
-    gathering: `The AI is asking ${who(c)} for details`,
-    replied: `You replied to ${who(c)}`,
-    'no-reply': `Missed call from ${c.phone}, texted back`,
-    'opted-out': `${who(c)} opted out`
-  }[c.status] || who(c)));
-  const items = events.length ? events : ['Waiting for the first missed call', 'Every missed call gets a text in seconds'];
-  const row = items.map(t => `<span>${esc(t)}</span>`).join('');
-  return `<div class="ticker" aria-hidden="true"><div class="ticker-track">${row}${row}</div></div>`;
-}
-
 // A big card for someone the owner should answer.
 function jobCard(c) {
   const ready = c.status === 'ready';
@@ -355,7 +339,7 @@ function feedRow(c) {
   return `
     <a href="#conversations" data-open="${c.id}">
       <span class="dot ${c.status}"></span>
-      <span><b>${esc(who(c))}</b><p>${esc(lastText(c))}</p></span>
+      <span><b>${esc(who(c))}</b><p>${esc(lineFor(c))}</p></span>
       <span class="side"><span class="pill ${c.status}">${STATUS[c.status]}${c.status === 'booked' ? ' ' + money(c.value) : ''}</span><time>${dayName(c.daysAgo)} ${esc(c.time)}</time></span>
     </a>`;
 }
@@ -393,7 +377,6 @@ function heroChart() {
     svg += `<rect class="day-bar fade-in" x="${x(i) - bw / 2}" y="${y(0) - h}" width="${bw}" height="${h}" rx="${Math.min(4, bw / 2)}"/>`;
   });
   svg += `<path class="fade-in" d="${area}" fill="url(#heroFill)"/>`;
-  if (!phone) svg += `<path d="${line}" fill="none" stroke="#C8FF2E" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" opacity=".22" filter="url(#heroGlow)"/>`;
   svg += `<path class="draw" d="${line}" fill="none" stroke="url(#heroLine)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>`;
   if (n <= 30) pts.forEach(([px, py], i) => { if (dailySum[i]) svg += `<circle class="fade-in" cx="${px}" cy="${py}" r="${n > 7 ? 3.5 : 5}" fill="var(--bg)" stroke="#C8FF2E" stroke-width="2"/>`; });
   // a flag on the best day
@@ -402,9 +385,8 @@ function heroChart() {
     const anchor = best > n * 0.8 ? 'end' : best < n * 0.2 ? 'start' : 'middle';
     svg += `<g class="fade-in"><line x1="${bx}" x2="${bx}" y1="${by - 9}" y2="${T - 16}" stroke="var(--mid)" stroke-dasharray="2 4"/><text x="${bx}" y="${T - 22}" text-anchor="${anchor}" class="flag-text">Best day: ${money(dailySum[best])}</text></g>`;
   }
-  // the total so far, pulsing at the end of the line
+  // the total so far, at the end of the line
   const [lx, ly] = pts[n - 1];
-  if (!phone) svg += `<circle cx="${lx}" cy="${ly}" r="16" fill="#C8FF2E" opacity=".16"><animate attributeName="r" values="10;22;10" dur="2.4s" repeatCount="indefinite"/></circle>`;
   svg += `<circle class="fade-in" cx="${lx}" cy="${ly}" r="${phone ? 5 : 7}" fill="#C8FF2E"/>`;
   days.forEach((d, i) => { if ((i % every === 0 && n - 1 - i >= every / 2) || i === n - 1) svg += `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" class="axis${d.ago === 0 ? ' today' : ''}">${esc(d.label)}</text>`; });
   days.forEach((d, i) => {
@@ -416,7 +398,6 @@ function heroChart() {
       <defs>
         <linearGradient id="heroFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C8FF2E" stop-opacity=".38"/><stop offset="1" stop-color="#C8FF2E" stop-opacity="0"/></linearGradient>
         <linearGradient id="heroLine" x1="0" x2="1"><stop offset="0" stop-color="#86AE1E"/><stop offset="1" stop-color="#EAFF9E"/></linearGradient>
-        <filter id="heroGlow" x="-10%" y="-60%" width="120%" height="220%"><feGaussianBlur stdDeviation="6"/></filter>
       </defs>
       ${svg}
     </svg>`;
@@ -523,16 +504,15 @@ function weekChart() {
       base = top;
     });
     const today = d.ago === 0;
-    // Today: a soft green column behind it on phones, a glow on the floor on computers
+    // Today: a soft green column behind it on phones
     if (today && phone) svg += `<rect x="${x - 5}" y="${base - 34}" width="${bw + 10}" height="${H - base + 30}" rx="10" fill="rgba(200, 255, 46, .1)"/>`;
-    else if (today && d.list.length) svg += `<ellipse cx="${x + (bw + dx) / 2}" cy="${y0 - dy / 2}" rx="${bw * 0.9 + 6}" ry="${dy + 6}" fill="#C8FF2E" opacity=".22" filter="url(#colGlow)"/>`;
     svg += `<g class="col" style="--i: ${(i * 7 / n).toFixed(2)}">${col}</g>`;
     if (d.list.length && (n <= 14 || d.list.length === max)) svg += `<text x="${x + (bw + dx) / 2}" y="${base - dy - 10}" text-anchor="middle" class="col-num">${d.list.length}</text>`;
     if ((i % every === 0 && n - 1 - i >= every / 2) || today) svg += `<text x="${x + bw / 2}" y="${H - 10}" text-anchor="middle" class="axis${today ? ' today' : ''}">${esc(d.label)}</text>`;
     const tip = `${d.span || d.label}: ${d.list.length} missed, ${d.booked + d.replied} texted back, ${d.booked} booked`;
     svg += `<rect x="${L + i * step}" y="0" width="${step}" height="${H}" fill="transparent" data-tip="${esc(tip)}"/>`;
   });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Missed calls over the last ${range} days"><defs><filter id="colGlow" x="-50%" y="-100%" width="200%" height="300%"><feGaussianBlur stdDeviation="8"/></filter></defs>${svg}</svg>`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Missed calls over the last ${range} days">${svg}</svg>`;
 }
 
 // Only in test mode: pretend to be a caller.
@@ -648,7 +628,7 @@ function conversationsPage() {
 
 function listItem(x) {
   // Once the AI has the details, the one-line job summary says more than the last text.
-  const line = x.summary && x.status !== 'no-reply' ? x.summary : lastText(x);
+  const line = x.summary && x.status !== 'no-reply' ? x.summary : lineFor(x);
   const progress = x.status === 'gathering' ? ` ${detailsIn(x)}/${checklist().length}` : '';
   return `
     <button type="button" data-open="${x.id}" title="${esc(who(x))}" class="${x.id === openId ? 'active' : ''} ${x.status}">
@@ -959,6 +939,7 @@ function soonPage() {
   ];
   return `
     <header class="soon-hero">
+      <a class="link" href="#autotext">&larr; Settings</a>
       <h1 class="page-title">Next <span class="hi">up.</span></h1>
       <p class="hero-sub">You have Text-Back. These plans turn on here when they're ready.</p>
       <div class="tape-band" aria-hidden="true"></div>
@@ -985,6 +966,7 @@ const PAGES = {
   frontdesk: soonPage,
   crew: soonPage
 };
+const NEXT_UP_PAGES = { frontdesk: 1, crew: 1 }; // not in the menu: they open from Settings
 const currentPage = () => location.hash.slice(1) in PAGES ? location.hash.slice(1) : 'overview';
 
 // Animations play when a page opens, not on the quiet refresh every 15 seconds.
@@ -1012,7 +994,7 @@ function render() {
     box.value = old.value;
     if (old.focused) { box.focus(); box.setSelectionRange(old.at, old.at); }
   }
-  document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page || (page === 'crew' && a.dataset.page === 'frontdesk')));
+  document.querySelectorAll('.nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page || (page in NEXT_UP_PAGES && a.dataset.page === 'autotext')));
   document.getElementById('biz-name').textContent = data.business.name;
   document.getElementById('waiting-count').textContent = stats().waiting || '';
   const chip = document.getElementById('side-foot');
@@ -1341,7 +1323,7 @@ async function saveName(form) {
 // ---------- Command menu: ⌘K (Ctrl K on Windows) jumps to any page or person ----------
 
 const onMac = /Mac|iPhone|iPad/.test(navigator.platform);
-const SHORTCUTS = [['overview', 'Today', '1'], ['conversations', 'Texts', '2'], ['autotext', 'Settings', '3'], ['frontdesk', 'Next up', '4']];
+const SHORTCUTS = [['overview', 'Today', '1'], ['conversations', 'Texts', '2'], ['autotext', 'Settings', '3']];
 let menu = null, menuRows = [], menuPick = 0;
 
 function goToChat(id) {
@@ -1362,7 +1344,8 @@ function menuCommands(typed) {
   const pages = SHORTCUTS.map(([page, label, key]) => ({ label, hint: 'Page', key, run: () => { location.hash = page; } }));
   const views = [
     { label: 'Texts that need you', hint: 'Texts', run: () => { filter = 'needs'; search = ''; if (currentPage() === 'conversations') render(); else location.hash = 'conversations'; } },
-    ...[7, 30, 60].map(days => ({ label: `Last ${days} days`, hint: 'Today', run: () => goToRange(days) }))
+    ...[7, 30, 60].map(days => ({ label: `Last ${days} days`, hint: 'Today', run: () => goToRange(days) })),
+    { label: 'Next up', hint: 'Page', run: () => { location.hash = 'frontdesk'; } }
   ];
   const people = data.conversations
     .filter(c => word ? fits(`${who(c)} ${c.phone} #${c.id}`) : needsYou(c))

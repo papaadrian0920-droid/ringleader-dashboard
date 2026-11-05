@@ -16,6 +16,8 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 
 // Puts the business name into a message template.
 const fill = template => String(template).replace(/\{business\}/g, data.business.name);
+// And takes it back out: the owner sees their real name, but the saved text still follows if the name ever changes.
+const unfill = text => data.business.name ? String(text).split(data.business.name).join('{business}') : String(text);
 
 // The server adds this to every auto-text that doesn't already mention STOP.
 const withOptOut = text => /\bSTOP\b/i.test(text) ? text : text.trim() + ' Reply STOP to opt out.';
@@ -779,8 +781,8 @@ function textPieces(message) {
 
 function autotextPage() {
   const a = data.autoText;
-  const section = (n, title, body) => `
-    <section class="set"><span class="num" aria-hidden="true">${n}</span><div class="set-body"><h2>${title}</h2>${body}</div></section>`;
+  const section = (title, body) => `
+    <section class="set"><div class="set-body"><h2>${title}</h2>${body}</div></section>`;
   return `
     <header class="page-top">
       <h1 class="page-title">Settings<span class="hi">.</span></h1>
@@ -788,34 +790,34 @@ function autotextPage() {
 
     <div class="settings">
       <div class="settings-main">
-        ${section('01', 'The first text', `
-          <p class="note">Every missed caller gets this. Write {business} and it fills in your company name.</p>
+        ${section('The first text', `
+          <p class="note">Every missed caller gets this.</p>
           <div class="field">
             <label for="msg-main">When you're open</label>
-            <textarea id="msg-main" maxlength="480">${esc(a.message)}</textarea>
+            <textarea id="msg-main" maxlength="480">${esc(fill(a.message))}</textarea>
             <div class="meta" id="meta-main"></div>
           </div>
           <div class="field">
             <label for="contact-line">Contact line</label>
-            <input id="contact-line" maxlength="160" value="${esc(a.contactLine || '')}" placeholder="12 King St W, Hamilton ON, mikesplumbing.ca">
-            <p class="note">Canada's anti-spam law (CASL) needs your mailing address and a phone, email or website in business texts. It goes at the end, before "Reply STOP to opt out." Plain keyboard characters only: one emoji makes every text cost double.</p>
+            <input id="contact-line" maxlength="160" value="${esc(a.contactLine || '')}" placeholder="12 King St W, Hamilton ON, mikesheating.ca">
+            <p class="note">The law says business texts need your mailing address and a phone, email or website. It goes at the end, before "Reply STOP to opt out." Use plain keyboard characters: one emoji makes every text cost double.</p>
           </div>`)}
 
-        ${section('02', 'When you’re closed', `
+        ${section('When you’re closed', `
           <label class="toggle" for="ah-on"><input type="checkbox" id="ah-on" ${a.afterHoursOn ? 'checked' : ''}>Send a different text when you're closed</label>
           <div class="field">
-            <textarea id="msg-after" maxlength="480" aria-label="Closed text" ${a.afterHoursOn ? '' : 'disabled'}>${esc(a.afterHoursMessage)}</textarea>
+            <textarea id="msg-after" maxlength="480" aria-label="Closed text" ${a.afterHoursOn ? '' : 'disabled'}>${esc(fill(a.afterHoursMessage))}</textarea>
             <div class="meta" id="meta-after"></div>
           </div>`)}
 
-        ${section('03', 'Next-day follow-up', `
+        ${section('Next-day follow-up', `
           <label class="toggle" for="fu-on"><input type="checkbox" id="fu-on" ${a.followUpOn ? 'checked' : ''}>Follow up the next day if they don't reply</label>
           <div class="field">
-            <textarea id="msg-follow" maxlength="480" aria-label="Follow-up text" ${a.followUpOn ? '' : 'disabled'}>${esc(a.followUpMessage || '')}</textarea>
+            <textarea id="msg-follow" maxlength="480" aria-label="Follow-up text" ${a.followUpOn ? '' : 'disabled'}>${esc(fill(a.followUpMessage || ''))}</textarea>
             <p class="note">Sent once, about a day later, while you're open. Skipped if they wrote back, you texted them, or they texted STOP.</p>
           </div>`)}
 
-        ${section('04', 'Assistant and alerts', `
+        ${section('Assistant and alerts', `
           <label class="toggle" for="intake-on"><input type="checkbox" id="intake-on" ${a.intakeOn ? 'checked' : ''}>Have the AI get every job detail first, then text me one summary</label>
           <ol class="checklist-chips" aria-label="What the AI gets from every caller">
             ${checklist().map(i => `<li>${esc(i.label)}</li>`).join('')}
@@ -823,40 +825,46 @@ function autotextPage() {
           <label class="toggle" for="notify-on"><input type="checkbox" id="notify-on" ${a.notifyOwner ? 'checked' : ''}>Text me at ${esc(data.business.ownerPhone)} when a customer replies</label>
           <div class="summary-row">
             <label class="toggle" for="summary-on"><input type="checkbox" id="summary-on" ${a.summaryOn ? 'checked' : ''}>Text me a morning summary at</label>
-            <input id="summary-time" aria-label="Summary time" value="${esc(a.summaryTime || '7:00 AM')}" ${a.summaryOn ? '' : 'disabled'}>
+            <input id="summary-time" type="time" aria-label="Summary time" value="${esc(to24(a.summaryTime || '7:00 AM'))}" ${a.summaryOn ? '' : 'disabled'}>
           </div>`)}
 
-        ${section('05', 'Business hours', `
-          <p class="note">Outside these hours, callers get the "closed" text. Type times like 7:00 AM.</p>
+        ${section('Business hours', `
+          <p class="note">Outside these hours, callers get the "closed" text.</p>
           <div class="hours-edit">
             ${data.hours.map((h, i) => `
               <div class="hours-row">
                 <label class="toggle" for="open-${i}"><input type="checkbox" id="open-${i}" data-day="${i}" ${h.open ? 'checked' : ''}>${h.day}</label>
-                <input id="from-${i}" aria-label="${h.day} opens" value="${esc(h.open || '7:00 AM')}" ${h.open ? '' : 'disabled'}>
+                <input id="from-${i}" type="time" aria-label="${h.day} opens" value="${esc(to24(h.open || '7:00 AM'))}" ${h.open ? '' : 'disabled'}>
                 <span>to</span>
-                <input id="to-${i}" aria-label="${h.day} closes" value="${esc(h.close || '6:00 PM')}" ${h.open ? '' : 'disabled'}>
+                <input id="to-${i}" type="time" aria-label="${h.day} closes" value="${esc(to24(h.close || '6:00 PM'))}" ${h.open ? '' : 'disabled'}>
               </div>`).join('')}
           </div>`)}
 
-        ${section('06', 'Never text these numbers', `
+        ${section('Never text these numbers', `
           <div class="field">
             <textarea id="never-text" aria-label="Never text these numbers" placeholder="(905) 555-0123">${esc((a.neverText || []).join('\n'))}</textarea>
             <p class="note">One number per line. Family, friends, suppliers: their missed calls won't get a text.</p>
           </div>`)}
 
-        ${section('07', 'Send ready jobs out', `
-          <div class="field">
-            <label for="job-link">Link <span class="opt">(optional)</span></label>
-            <div class="link-row">
-              <input id="job-link" type="url" inputmode="url" placeholder="https://" value="${esc(a.jobLink || '')}" autocomplete="off" spellcheck="false">
-              <button class="btn" type="button" id="test-link">Send a test</button>
-            </div>
-            <p class="note">When a job is ready to book, or you mark it booked, Ringleader sends all its details to this link. Paste a link from n8n or Zapier to put jobs into Jobber, Housecall Pro or a Google Sheet. Leave it blank to turn it off.</p>
-          </div>`)}
+        ${section('Setup', `
+          <ul class="checks">${data.setup.map(s => `<li class="${s.done ? 'done' : ''}">${esc(s.label.replace(' (CASL)', ''))}</li>`).join('')}</ul>
+          <p class="note">Your Ringleader number: <b>${esc(data.business.ringleaderNumber || 'not set up yet')}</b></p>
+          <a class="link" href="#frontdesk">See what's coming next &rarr;</a>`)}
 
-        ${section('08', 'Setup', `
-          <ul class="checks">${data.setup.map(s => `<li class="${s.done ? 'done' : ''}">${esc(s.label)}</li>`).join('')}</ul>
-          <p class="note">Your Ringleader number: <b>${esc(data.business.ringleaderNumber || 'not set up yet')}</b></p>`)}
+        <details class="set advanced" ${a.jobLink ? 'open' : ''}>
+          <summary>Advanced</summary>
+          <div class="set-body">
+            <h2>Send ready jobs out</h2>
+            <div class="field">
+              <label for="job-link">Link <span class="opt">(optional)</span></label>
+              <div class="link-row">
+                <input id="job-link" type="url" inputmode="url" placeholder="https://" value="${esc(a.jobLink || '')}" autocomplete="off" spellcheck="false">
+                <button class="btn" type="button" id="test-link">Send a test</button>
+              </div>
+              <p class="note">Use job software like Jobber or Housecall Pro? Paste your connection link here and every ready or booked job goes into it. Not sure? Leave it empty.</p>
+            </div>
+          </div>
+        </details>
 
         <div class="save-row">
           <button class="btn btn-main" type="button" id="save">Save changes</button>
@@ -892,22 +900,36 @@ function updateAutotext() {
   document.getElementById('preview-bubble').textContent = source.value.trim() ? autoTextOf(source.value, contact) : '…';
 }
 
+// Times are saved like "7:00 AM", but time boxes work in 24-hour time, so convert both ways.
+function to24(time) {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(String(time || '').trim());
+  if (!m) return '';
+  const hour = Number(m[1]) % 12 + (/pm/i.test(m[3]) ? 12 : 0);
+  return `${String(hour).padStart(2, '0')}:${m[2]}`;
+}
+function to12(value) {
+  const m = /^(\d{2}):(\d{2})/.exec(String(value || ''));
+  if (!m) return '';
+  const hour = Number(m[1]);
+  return `${hour % 12 || 12}:${m[2]} ${hour < 12 ? 'AM' : 'PM'}`;
+}
+
 function readSettingsForm() {
   return {
-    message: document.getElementById('msg-main').value,
-    afterHoursMessage: document.getElementById('msg-after').value,
+    message: unfill(document.getElementById('msg-main').value),
+    afterHoursMessage: unfill(document.getElementById('msg-after').value),
     afterHoursOn: document.getElementById('ah-on').checked,
     contactLine: document.getElementById('contact-line').value,
     notifyOwner: document.getElementById('notify-on').checked,
     intakeOn: document.getElementById('intake-on').checked,
     followUpOn: document.getElementById('fu-on').checked,
-    followUpMessage: document.getElementById('msg-follow').value,
+    followUpMessage: unfill(document.getElementById('msg-follow').value),
     summaryOn: document.getElementById('summary-on').checked,
-    summaryTime: document.getElementById('summary-time').value,
+    summaryTime: to12(document.getElementById('summary-time').value) || data.autoText.summaryTime,
     neverText: document.getElementById('never-text').value.split('\n').map(n => n.trim()).filter(Boolean),
     jobLink: document.getElementById('job-link').value.trim(),
     hours: data.hours.map((h, i) => document.getElementById('open-' + i).checked
-      ? { day: h.day, open: document.getElementById('from-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1'), close: document.getElementById('to-' + i).value.trim().toUpperCase().replace(/\s*(AM|PM)$/, ' $1') }
+      ? { day: h.day, open: to12(document.getElementById('from-' + i).value) || h.open || '7:00 AM', close: to12(document.getElementById('to-' + i).value) || h.close || '6:00 PM' }
       : { day: h.day, open: null, close: null })
   };
 }

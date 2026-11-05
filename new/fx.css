@@ -425,3 +425,19 @@ kbd { font: 600 .72rem/1 var(--f-mono); padding: 4px 6px; border-radius: 6px; bo
   .inbox.swiping > .inbox-side { display: flex; position: absolute; inset: 28px 16px auto; opacity: calc(.35 + .65 * var(--swipe-p, 0)); transform: translateX(calc(-8% + 8% * var(--swipe-p, 0))); }
   .inbox.settling > .thread, .inbox.settling > .inbox-side { transition: transform .22s var(--ease), opacity .22s; }
 }
+
+/* ---------- Settings: time boxes that match the dark look, and the Advanced fold ---------- */
+input[type="time"] { color-scheme: dark; min-height: 44px; font-variant-numeric: tabular-nums; }
+.advanced summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; font-family: var(--f-display); font-weight: 900; font-stretch: 112%; font-size: 1.25rem; cursor: pointer; list-style: none; }
+.advanced summary::-webkit-details-marker { display: none; }
+.advanced summary::after { content: ""; width: 10px; height: 10px; margin-right: 6px; border-right: 3px solid var(--hivis); border-bottom: 3px solid var(--hivis); transform: rotate(45deg); transition: transform .25s var(--ease); }
+.advanced[open] summary::after { transform: rotate(-135deg); }
+.advanced[open] summary { margin-bottom: 12px; }
+.advanced h2 { font-size: 1.25rem; }
+@media (max-width: 560px) {
+  .set { padding: 18px; }
+  .hours-row { grid-template-columns: 100px minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; }
+  .hours-row input[type="time"] { padding-inline: 8px; font-size: .94rem; }
+  .hours-row input[type="time"]::-webkit-calendar-picker-indicator { display: none; }
+  .hours-row .toggle { gap: 8px; }
+}

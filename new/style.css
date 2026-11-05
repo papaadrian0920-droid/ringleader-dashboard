@@ -320,14 +320,13 @@ textarea { min-height: 112px; resize: vertical; line-height: 1.5; }
 
 
 /* ---------- Settings ---------- */
-.checklist-chips { list-style: none; margin: -2px 0 6px 52px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; counter-reset: item; }
+.checklist-chips { list-style: none; margin: -2px 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; counter-reset: item; }
 .checklist-chips li { counter-increment: item; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-2); font-weight: 600; font-size: .92rem; }
 .checklist-chips li::before { content: counter(item); font-family: var(--f-mono); color: var(--hivis); margin-right: 7px; }
 @media (max-width: 560px) { .checklist-chips { margin-left: 0; } }
 .settings { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: clamp(20px, 3vw, 36px); align-items: start; }
 .settings-main { display: grid; gap: 16px; }
-.set { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 4px 18px; padding: 24px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
-.set > .num { font-family: var(--f-display); font-weight: 900; font-stretch: 125%; font-size: 2.6rem; line-height: .9; color: transparent; -webkit-text-stroke: 1.5px var(--hivis); }
+.set { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px 18px; padding: 24px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
 .set-body { display: grid; gap: 14px; min-width: 0; }
 .set h2 { font-size: 1.6rem; font-weight: 900; font-stretch: 112%; line-height: 1; }
 .field { display: grid; gap: 8px; }

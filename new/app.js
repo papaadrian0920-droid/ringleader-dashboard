@@ -290,13 +290,16 @@ function overviewPage() {
           <div class="hero-chart">${heroChart()}</div>
         </div>
 
-        <div class="card week">
+        <div class="card week" aria-labelledby="week-title">
           <div class="card-head">
-            <h2>Missed calls by ${range > 30 ? 'week' : 'day'}</h2>
-            <div class="legend">
-              <span><i style="background: var(--hivis)"></i>Booked</span>
-              <span><i style="background: var(--mid)"></i>Texted back</span>
-              <span><i style="background: var(--dim)"></i>No reply</span>
+            <div class="week-heading">
+              <h2 id="week-title">Missed calls by ${range > 30 ? 'week' : 'day'}</h2>
+              <p class="note">${s.missed} missed call${s.missed === 1 ? '' : 's'} &middot; Last ${range} days</p>
+            </div>
+            <div class="legend" aria-label="Call outcomes">
+              <span><i class="legend-booked" aria-hidden="true"></i>Booked</span>
+              <span><i class="legend-replied" aria-hidden="true"></i>Replied, not booked</span>
+              <span><i class="legend-none" aria-hidden="true"></i>No reply</span>
             </div>
           </div>
           ${weekChart()}
@@ -456,8 +459,8 @@ function ringsHtml(s) {
     </div>`;
 }
 
-// "Missed calls": 3D stacked blocks. Green = booked, grey = texted back, dark = no reply.
-// 7 or 30 days get a block per day; 60 days get a block per week.
+// Flat stacked bars: every missed call belongs to exactly one outcome.
+// 7 or 30 days get a bar per day; 60 days get a bar per week.
 function weekChart() {
   let buckets = rangeDays();
   if (range > 30) {
@@ -470,51 +473,45 @@ function weekChart() {
   }
   const rows = buckets.map(d => {
     const booked = d.list.filter(c => c.status === 'booked').length;
-    const replied = Math.max(0, d.list.filter(customerReplied).length - booked);
-    return { ...d, booked, replied, none: Math.max(0, d.list.length - booked - replied) };
+    const replied = d.list.filter(c => c.status !== 'booked' && customerReplied(c)).length;
+    return { ...d, booked, replied, none: d.list.length - booked - replied };
   });
-  // Phones get a narrower chart with flat blocks (no 3D sides), so it reads at a glance
   const phone = isPhone();
-  const n = rows.length, W = phone ? 360 : 960, H = phone ? 250 : 320, L = phone ? 8 : 40, R = phone ? 8 : 34, T = 48, B = 40;
-  const max = Math.max(4, ...rows.map(d => d.list.length));
-  const step = (W - L - R) / n, bw = step * (phone ? 0.66 : 0.58);
-  const dx = phone ? 0 : Math.min(22, step * 0.3), dy = dx * 0.6;
+  const n = rows.length, dense = n > 14;
+  const W = phone ? (dense ? 720 : n > 7 ? 560 : 360) : 960;
+  const H = phone ? 250 : 300, L = phone ? 30 : 42, R = 12, T = 30, B = 38;
+  const tickStep = Math.max(1, Math.ceil(Math.max(4, ...rows.map(d => d.list.length)) / 4));
+  const max = tickStep * 4;
+  const step = (W - L - R) / n, bw = Math.min(phone ? 32 : 54, step * .56);
   const y = v => T + (H - T - B) * (1 - v / max);
   const y0 = y(0), unit = y0 - y(1);
   let svg = '';
-  if (!phone) {
-    svg += `<polygon points="${L},${y0} ${W - R},${y0} ${W - R + dx},${y0 - dy} ${L + dx},${y0 - dy}" fill="rgba(255,255,255,.03)" stroke="var(--line)"/>`;
-    const tickStep = max > 8 ? Math.ceil(max / 4) : 2;
-    for (let v = tickStep; v <= max; v += tickStep) {
-      svg += `<line x1="${L + dx}" x2="${W - R + dx}" y1="${y(v) - dy}" y2="${y(v) - dy}" stroke="var(--line)" stroke-dasharray="3 6"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" class="axis">${v}</text>`;
-    }
+  for (let v = 0; v <= max; v += tickStep) {
+    svg += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" class="week-grid${v ? '' : ' baseline'}"/><text x="${L - 10}" y="${y(v) + 4}" text-anchor="end" class="axis">${v}</text>`;
   }
-  // [front, top, side] for each kind of block
-  const COL = { booked: ['#C8FF2E', '#E6FF94', '#8FB41E'], replied: ['#8C8C86', '#B3B3AD', '#62625D'], none: ['#3A3A40', '#55555D', '#28282D'] };
-  const every = phone && n <= 7 ? 1 : Math.ceil(n / (phone ? 5 : 10));
+  const every = Math.ceil(n / (phone && n <= 7 ? 7 : 10));
   rows.forEach((d, i) => {
-    const x = L + i * step + (step - bw - dx) / 2;
+    const x = L + i * step + (step - bw) / 2;
     let base = y0, col = '';
     [['booked', d.booked], ['replied', d.replied], ['none', d.none]].forEach(([kind, count]) => {
       if (!count) return;
       const top = base - count * unit;
-      const [front, lid, side] = COL[kind];
-      if (phone) col += `<rect x="${x}" y="${top + 2}" width="${bw}" height="${Math.max(1, base - top - 4)}" rx="${Math.min(6, bw / 4)}" fill="${front}"/>`;
-      else col += `<rect x="${x}" y="${top}" width="${bw}" height="${base - top}" fill="${front}"/>`
-        + `<polygon points="${x + bw},${top} ${x + bw + dx},${top - dy} ${x + bw + dx},${base - dy} ${x + bw},${base}" fill="${side}"/>`
-        + `<polygon points="${x},${top} ${x + dx},${top - dy} ${x + bw + dx},${top - dy} ${x + bw},${top}" fill="${lid}"/>`;
+      col += `<rect class="week-segment ${kind}" x="${x}" y="${top}" width="${bw}" height="${count * unit}"/>`;
       base = top;
     });
     const today = d.ago === 0;
-    // Today: a soft green column behind it on phones
-    if (today && phone) svg += `<rect x="${x - 5}" y="${base - 34}" width="${bw + 10}" height="${H - base + 30}" rx="10" fill="rgba(200, 255, 46, .1)"/>`;
-    svg += `<g class="col" style="--i: ${(i * 7 / n).toFixed(2)}">${col}</g>`;
-    if (d.list.length && (n <= 14 || d.list.length === max)) svg += `<text x="${x + (bw + dx) / 2}" y="${base - dy - 10}" text-anchor="middle" class="col-num">${d.list.length}</text>`;
+    const tip = `${d.span || d.label}: ${d.list.length} missed — ${d.booked} booked, ${d.replied} replied but not booked, ${d.none} no reply`;
+    svg += `<g class="week-bar" tabindex="0" role="img" aria-label="${esc(tip)}" data-tip="${esc(tip)}"><title>${esc(tip)}</title><rect class="week-hover" x="${L + i * step + 2}" y="${T - 20}" width="${step - 4}" height="${H - T + 16}" rx="6"/>${col}`;
+    if (!dense || d.list.length) svg += `<text x="${x + bw / 2}" y="${base - 10}" text-anchor="middle" class="col-num">${d.list.length}</text>`;
     if ((i % every === 0 && n - 1 - i >= every / 2) || today) svg += `<text x="${x + bw / 2}" y="${H - 10}" text-anchor="middle" class="axis${today ? ' today' : ''}">${esc(d.label)}</text>`;
-    const tip = `${d.span || d.label}: ${d.list.length} missed, ${d.booked + d.replied} texted back, ${d.booked} booked`;
-    svg += `<rect x="${L + i * step}" y="0" width="${step}" height="${H}" fill="transparent" data-tip="${esc(tip)}"/>`;
+    svg += `<rect x="${L + i * step}" y="0" width="${step}" height="${H}" fill="transparent"/></g>`;
   });
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Missed calls over the last ${range} days">${svg}</svg>`;
+  const scrollClass = dense ? ' is-dense' : n > 7 ? ' is-weekly' : '';
+  const total = rows.reduce((sum, d) => sum + d.list.length, 0);
+  return `<div class="week-chart-scroll"><svg class="week-plot${scrollClass}" viewBox="0 0 ${W} ${H}" role="group" aria-label="${total} missed calls over the last ${range} days, split by outcome">${svg}</svg></div>
+    <details class="week-data"><summary>View ${range > 30 ? 'weekly' : 'daily'} breakdown</summary>
+      <div class="week-table-scroll"><table><caption class="sr-only">Missed call outcomes over the last ${range} days</caption><thead><tr><th scope="col">${range > 30 ? 'Week' : 'Day'}</th><th scope="col">Booked</th><th scope="col">Replied, not booked</th><th scope="col">No reply</th><th scope="col">Total</th></tr></thead><tbody>${rows.map(d => `<tr><th scope="row">${esc(d.span || d.label)}</th><td>${d.booked}</td><td>${d.replied}</td><td>${d.none}</td><td>${d.list.length}</td></tr>`).join('')}</tbody></table></div>
+    </details>`;
 }
 
 // Only in test mode: pretend to be a caller.
@@ -996,6 +993,7 @@ let animateNext = true;
 
 function render() {
   const page = currentPage();
+  document.body.dataset.page = page;
   const animate = animateNext;
   animateNext = false;
   main.className = 'main' + (animate ? ' animate' : '');

@@ -1,0 +1,159 @@
+/* A quieter palette for Today and Texts. Settings keeps its existing styling. */
+body:is([data-page="overview"], [data-page="conversations"])::before,
+body:is([data-page="overview"], [data-page="conversations"]) .app::before,
+body:is([data-page="overview"], [data-page="conversations"]) .app::after { display: none; }
+body:is([data-page="overview"], [data-page="conversations"])::after { opacity: .018; }
+body:is([data-page="overview"], [data-page="conversations"]) .card:hover { border-color: var(--line); }
+
+/* Today: the booked total remains the main accent; secondary controls stay neutral. */
+body[data-page="overview"] .range button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+body[data-page="overview"] .fold-sum { color: var(--soft); }
+body[data-page="overview"] .fold-chev { color: var(--ink); }
+body[data-page="overview"] .fold-btn:hover { border-color: #4b4b50; }
+
+/* Flat, shared-baseline bars. The swatches and segments use the same three tones. */
+.week { --chart-booked: #efefec; --chart-replied: #929299; --chart-none: #48484f; }
+.week .card-head { align-items: center; gap: 18px 24px; margin-bottom: 26px; }
+.week-heading { display: grid; gap: 10px; }
+.week-heading h2 { font-size: clamp(1.3rem, 2.4vw, 1.75rem); font-weight: 800; font-stretch: 108%; }
+.week-heading .note { color: #a4a4aa; font-size: .9rem; }
+.week .legend { gap: 10px 20px; color: #bdbdc3; font-size: .82rem; font-weight: 500; }
+.week .legend i { width: 10px; height: 10px; border-radius: 2px; }
+.week .legend-booked, .week-segment.booked { background: var(--chart-booked); fill: var(--chart-booked); }
+.week .legend-replied, .week-segment.replied { background: var(--chart-replied); fill: var(--chart-replied); }
+.week .legend-none, .week-segment.none { background: var(--chart-none); fill: var(--chart-none); }
+.week-chart-scroll { overflow-x: auto; scrollbar-width: thin; }
+.week svg { display: block; width: 100%; height: auto; overflow: visible; }
+.week-grid { stroke: #2c2c31; stroke-width: 1; stroke-dasharray: 3 6; }
+.week-grid.baseline { stroke: #44444b; stroke-dasharray: none; }
+.week .axis { fill: #9d9da5; font: 500 13px var(--f-body); }
+.week .axis.today { fill: var(--ink); font-weight: 700; }
+.week .col-num { fill: #e2e2e7; font: 600 16px var(--f-body); font-variant-numeric: tabular-nums; }
+.week-segment { stroke: var(--panel); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.week-hover { fill: #ffffff; opacity: 0; transition: opacity .15s; }
+.week-bar { outline: none; }
+.week-bar:hover .week-hover, .week-bar:focus-visible .week-hover { opacity: .045; }
+.week-bar:focus-visible .week-hover { stroke: var(--ink); stroke-width: 1.5; }
+.week-data { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.week-data summary { width: fit-content; color: #b2b2ba; cursor: pointer; font-size: .8rem; font-weight: 500; }
+.week-data summary:hover { color: var(--ink); }
+.week-data summary:focus-visible { outline-color: var(--ink); }
+.week-table-scroll { overflow-x: auto; margin-top: 16px; }
+.week-data table { width: 100%; border-collapse: collapse; text-align: right; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.week-data th, .week-data td { border-bottom: 1px solid var(--line); padding: 10px 12px; white-space: nowrap; }
+.week-data th { color: var(--soft); font-weight: 500; }
+.week-data th:first-child { text-align: left; padding-left: 0; }
+.week-data td:last-child { color: var(--ink); font-weight: 700; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* Texts: clear surfaces, quiet metadata, and green reserved for identity and actions. */
+body[data-page="conversations"] { --soft: #b6b6be; --mid: #909098; }
+body[data-page="conversations"] :focus-visible { outline-color: var(--ink); }
+body[data-page="conversations"] .inbox { gap: 0; }
+body[data-page="conversations"] .side-top { gap: 16px; }
+body[data-page="conversations"] .side-top .page-title { font-stretch: 115%; font-size: 2.3rem; }
+body[data-page="conversations"] .side-top .tabs { gap: 6px; }
+body[data-page="conversations"] .side-top .tabs button { font-family: var(--f-body); font-weight: 600; border-color: #303035; }
+body[data-page="conversations"] .tabs .n { font-family: var(--f-body); font-variant-numeric: tabular-nums; background: transparent; color: #91919a; }
+body[data-page="conversations"] .tabs button[aria-pressed="true"] .n { background: transparent; color: #55555d; }
+body[data-page="conversations"] .search { background: #151517; border-radius: 12px; }
+body[data-page="conversations"] .search:focus-within { border-color: #74747d; box-shadow: 0 0 0 3px rgba(255, 255, 255, .05); }
+body[data-page="conversations"] .search input { font-size: .92rem; }
+body[data-page="conversations"] .inbox-list .group { font-family: var(--f-body); font-size: .72rem; font-weight: 600; letter-spacing: .08em; padding: 16px 10px 8px; background: var(--bg); }
+body[data-page="conversations"] .inbox-list button { padding: 12px 10px; border-radius: 12px; }
+body[data-page="conversations"] .inbox-list button.active { background: #202023; border-color: #343439; }
+body[data-page="conversations"] .inbox-list button.active::before { width: 3px; top: 18px; bottom: 18px; background: #dedee2; }
+body[data-page="conversations"] .inbox-list b { font-family: var(--f-body); font-size: .98rem; font-weight: 650; letter-spacing: -.015em; }
+body[data-page="conversations"] .inbox-list time { font-family: var(--f-body); font-size: .72rem; font-weight: 500; color: #9b9ba3; }
+body[data-page="conversations"] .inbox-list .preview { font-size: .86rem; color: #a2a2ab; }
+body[data-page="conversations"] .inbox-list button > .tag { border-color: #45454d; color: #ceced4; background: transparent; font: 600 .65rem/1 var(--f-body); letter-spacing: .01em; text-transform: none; padding: 6px 8px; }
+body[data-page="conversations"] .inbox-list .tag.waiting,
+body[data-page="conversations"] .inbox-list .tag.ready { background: #e4e4e8; border-color: transparent; color: #171719; }
+body[data-page="conversations"] .inbox-list .tag.gathering { border-style: solid; color: #b0b0b8; }
+body[data-page="conversations"] .inbox-list .tag.booked { padding: 0; border: 0; color: #bdbdc5; font-size: .8rem; font-variant-numeric: tabular-nums; }
+body[data-page="conversations"] .inbox-list .tag.opted-out { color: var(--red); border-color: rgba(255, 83, 64, .4); }
+body[data-page="conversations"] .av { border-radius: 11px; font-family: var(--f-body); font-weight: 700; }
+body[data-page="conversations"] :is(.av.ready, .av.waiting, .av.gathering) { background: #20231a; border: 1px solid #46512c; color: var(--hivis); box-shadow: none; }
+body[data-page="conversations"] .thread { background: #141416; border-color: #303034; border-radius: 18px; }
+body[data-page="conversations"] .thread-head { padding-block: 16px; background: #171719; }
+body[data-page="conversations"] .thread-who b { font-family: var(--f-body); font-size: 1.25rem; font-weight: 650; letter-spacing: -.025em; }
+body[data-page="conversations"] .thread-phone { font-family: var(--f-body); color: #95959e; font-size: .76rem; font-weight: 400; }
+body[data-page="conversations"] .edit { font-family: var(--f-body); font-size: .68rem; text-transform: none; }
+body[data-page="conversations"] .edit:hover { color: var(--ink); border-color: #686871; }
+body[data-page="conversations"] .head-btn { background: transparent; font-weight: 500; font-size: .86rem; }
+body[data-page="conversations"] .head-btn:hover,
+body[data-page="conversations"] .head-btn[aria-expanded="true"] { border-color: #666670; color: var(--ink); }
+body[data-page="conversations"] .head-btn small { color: #a7a7b0; }
+body[data-page="conversations"] .state { gap: 18px; background: #1a1a1d; padding-block: 12px; }
+body[data-page="conversations"] :is(.state.ready, .state.waiting, .state.booked) { background: #1a1a1d; border-color: var(--line); color: var(--ink); box-shadow: none; }
+body[data-page="conversations"] .state.waiting::before { display: none; }
+body[data-page="conversations"] .state .state-label { font-family: var(--f-body); font-size: .88rem; font-weight: 650; text-transform: none; letter-spacing: 0; color: #e7e7ec; }
+body[data-page="conversations"] .state.opted-out .state-label { color: var(--red); }
+body[data-page="conversations"] .state p { font-size: .84rem; font-weight: 400; color: #a8a8b2; }
+body[data-page="conversations"] .state.gathering .state-label::before { width: 6px; height: 6px; background: #b3b3bc; animation: none; }
+body[data-page="conversations"] .state .meter { height: 5px; }
+body[data-page="conversations"] .meter i { background: #b7b7c0; box-shadow: none; }
+body[data-page="conversations"] .state .btn-main,
+body[data-page="conversations"] .state.ready .btn-main:hover { background: var(--hivis); border-color: var(--hivis); color: var(--on-hivis); }
+body[data-page="conversations"] .state.booked .undo,
+body[data-page="conversations"] .state.booked .undo:hover { border-color: #4a4a53; color: var(--soft); }
+body[data-page="conversations"] .state .book-form input { background: #111113; color: var(--ink); border-color: #36363c; }
+body[data-page="conversations"] .state .book-form input::placeholder { color: #96969f; }
+body[data-page="conversations"] .btn-main:hover { transform: translateY(-1px); filter: brightness(1.05); }
+body[data-page="conversations"] input:not([type="checkbox"]):focus { border-color: #73737d; box-shadow: 0 0 0 3px rgba(255, 255, 255, .06); }
+body[data-page="conversations"] .msgs { gap: 18px; padding-top: 24px; padding-bottom: 26px; mask-image: none; -webkit-mask-image: none; }
+body[data-page="conversations"] .msg p { font-size: .96rem; line-height: 1.55; padding: 13px 17px; border-radius: 16px; }
+body[data-page="conversations"] .msg.customer p { background: #262629; border: 1px solid #323237; border-bottom-left-radius: 5px; }
+body[data-page="conversations"] .msg.assistant p { background: #1c1c1f; border: 1px solid #36363d; border-bottom-right-radius: 5px; color: #e5e5e9; }
+body[data-page="conversations"] .msg.auto p,
+body[data-page="conversations"] .msg.followup p { background: transparent; border-color: #323238; border-bottom-right-radius: 5px; color: #b4b4be; }
+body[data-page="conversations"] .msg.owner p { background: #e6e6e9; border-bottom-right-radius: 5px; color: #18181b; font-weight: 400; }
+body[data-page="conversations"] .msg small { font-family: var(--f-body); color: #90909b; font-size: .68rem; font-weight: 500; text-transform: none; letter-spacing: .015em; }
+body[data-page="conversations"] .msg.assistant small::before { content: none; }
+body[data-page="conversations"] .msg.failed p { border: 2px solid var(--red); }
+body[data-page="conversations"] .msg.failed small { color: var(--red); }
+body[data-page="conversations"] .sys { font-family: var(--f-body); font-size: .72rem; font-weight: 500; letter-spacing: .01em; text-transform: none; color: #9e9ea8; background: transparent; border-color: #303037; }
+body[data-page="conversations"] .sys.missed { border: 0; }
+body[data-page="conversations"] .sys.missed i { width: 5px; height: 5px; box-shadow: none; }
+body[data-page="conversations"] .sys.booked { padding: 7px 14px; background: #252529; color: #dcdce3; border: 1px solid #41414a; box-shadow: none; }
+body[data-page="conversations"] .sys.stop { border-color: rgba(255, 83, 64, .4); color: var(--red); }
+body[data-page="conversations"] .typing { border-color: #404048; }
+body[data-page="conversations"] .typing span { background: #9c9ca7; }
+body[data-page="conversations"] .typing small { color: #a0a0ab; text-transform: none; font-family: var(--f-body); }
+body[data-page="conversations"] .quick { padding-top: 12px; background: #161618; }
+body[data-page="conversations"] .quick button { background: transparent; border-color: #34343c; color: #b2b2bc; font-weight: 500; font-size: .78rem; }
+body[data-page="conversations"] .quick button:hover { border-color: #686873; color: var(--ink); background: #242428; }
+body[data-page="conversations"] .composer { background: #161618; padding-top: 12px; padding-bottom: 16px; }
+body[data-page="conversations"] .composer input { background: #0e0e10; font-size: .92rem; }
+body[data-page="conversations"] .composer .btn { padding-inline: 24px; }
+body[data-page="conversations"] .checklist h3 span { color: var(--soft); }
+body[data-page="conversations"] .checklist .got .tick { background: #37373e; color: #e4e4e9; }
+body[data-page="conversations"] .ring-mini .fg { stroke: #c5c5ce; filter: none; }
+body[data-page="conversations"] .unsure-note { border-left-color: #8d8d99; }
+body[data-page="conversations"] .back { color: var(--ink); }
+body[data-page="conversations"] .toast:not(.error) { background: var(--ink); color: var(--bg); box-shadow: 0 8px 30px rgba(0, 0, 0, .3); }
+body[data-page="conversations"] .toast button { background: var(--bg); color: var(--ink); }
+
+@media (max-width: 860px) {
+  .week .card-head { margin-bottom: 18px; }
+  .week .legend { gap: 10px 14px; font-size: .76rem; }
+  .week .axis { font-size: 12px; }
+  .week .col-num { font-size: 14px; }
+  .week-plot.is-dense { min-width: 720px; }
+  .week-plot.is-weekly { min-width: 560px; }
+  body[data-page="conversations"] .inbox-list button.waiting,
+  body[data-page="conversations"] .inbox-list button.ready { border-color: #3d3d44; background: #171719; }
+  body[data-page="conversations"] .inbox-list button { margin-bottom: 6px; padding-block: 14px; }
+  body[data-page="conversations"] .thread { border-radius: 0; background: var(--bg); }
+  body[data-page="conversations"] .thread-head { padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 8px max(4px, env(safe-area-inset-left)); }
+  body[data-page="conversations"] .thread-who b { font-size: 1.08rem; }
+  body[data-page="conversations"] .state { padding: 10px 12px; gap: 10px; }
+  body[data-page="conversations"] .state-label { font-size: .8rem; }
+  body[data-page="conversations"] .msg { max-width: 86%; }
+  body[data-page="conversations"] .msg p { font-size: .94rem; }
+  body[data-page="conversations"] .quick { padding-top: 8px; }
+  body[data-page="conversations"] .composer { padding: 8px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  body[data-page="conversations"] .composer input { font-size: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) { .week-hover { transition: none; } }
